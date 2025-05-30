@@ -39,8 +39,8 @@ class LoginWindow(QWidget):
         # Blurred Background layout
         self.blur_background = QFrame(self)
         self.blur_background.setStyleSheet("""
-            background-color: rgba(180, 180, 180, 0.30);
-            border: 1px solid rgba(180, 180, 180, 0.10);
+            background-color: rgba(180, 180, 180, 0.20);
+            border: 1px solid rgba(180, 180, 180, 0.50);
         """)
         blur = QGraphicsBlurEffect()
         blur.setBlurRadius(10)
@@ -127,7 +127,7 @@ class LoginWindow(QWidget):
                 border-radius: 20px;
             }
             QPushButton:hover {
-                background-color: #913752;
+                background-color: rgba(250,30,30,0.30);
             }
         """)
         self.login_btn.clicked.connect(self.login_user)
