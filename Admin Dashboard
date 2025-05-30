@@ -124,7 +124,7 @@ class Dashboard(QWidget):
         menu_label.setAlignment(Qt.AlignCenter)
         sidebar_layout.addWidget(menu_label)
 
-        options = ["HOMEPAGE", "ASSIGN BATCH", "PRODUCT DETAILS", "PENDING APPROVAL","MATURITY DATE", "CATEGORIES", "EMPLOYEES", "REPORTS"]
+        options = ["HOMEPAGE", "ASSIGN BATCH", "PRODUCT DETAILS", "PENDING APPROVAL", "USER REGISTRATION", "MATURITY DATE", "CATEGORIES", "REPORTS"]
         for option in options:
             btn = QPushButton(option)
             btn.setStyleSheet("""
@@ -328,12 +328,12 @@ class Dashboard(QWidget):
             self.title_text.setStyleSheet("color: white;")
             self.logout_btn.setStyleSheet("QPushButton {padding: 5px 15px; background-color: white; color: black; border-radius: 15px; font-size: 18px; border: 1px solid black; font-weight: bold; font-family: Gabriola;} QPushButton:hover {background-color: rgba(255, 255, 255, 0.50);}")
             self.theme_btn.setText("LIGHT MODE")
-            self.theme_btn.setStyleSheet("QPushButton {padding: 5px 15px; background-color: black; color: white; border-radius: 15px; font-size: 18px; border: 1px solid #aaa; font-weight: bold; font-family: Gabriola;} QPushButton:hover {background-color: rgba(255, 255, 255, 0.50);}")
+            self.theme_btn.setStyleSheet("QPushButton {padding: 5px 15px; background-color: #333; color: white; border-radius: 15px; font-size: 18px; border: 1px solid black; font-weight: bold; font-family: Gabriola;} QPushButton:hover {background-color: rgba(255, 255, 255, 0.50);}")
             self.trend_label.setStyleSheet("background-color: #333; color: white; padding: 20px; border-radius: 10px;")
             self.upcoming_label.setStyleSheet("background-color: #121212; color: white;")
             self.pending_label.setStyleSheet("background-color: #121212; color: white;")
             for btn in self.sidebar_buttons:
-                btn.setStyleSheet("QPushButton {background: black; color: white; font-weight: bold; border: 1px solid #aaa; border-radius: 15px; text-align: center; padding: 2px 12px; font-family: Gabriola;} QPushButton:hover {background-color: rgba(255, 255, 255, 0.50);}")
+                btn.setStyleSheet("QPushButton {background: #121212; color: white; font-weight: bold; border: 1px solid black; border-radius: 15px; text-align: center; padding: 2px 12px; font-family: Gabriola;} QPushButton:hover {background-color: rgba(255, 255, 255, 0.50);}")
             for label in self.dynamic_labels:
                 label.setStyleSheet("background-color: #1e1e1e; color: white; padding: 20px; border-radius: 10px;")
             self.dark_mode = True
