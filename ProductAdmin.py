@@ -362,7 +362,6 @@ class ProductManager(QMainWindow):
         self.load_products_from_db()
 
 
-
     
     # Loads all products from database into the table.
     def load_products_from_db(self):
@@ -372,7 +371,6 @@ class ProductManager(QMainWindow):
         for product in products:
             pid, category, name, description, qty, supplier_email, barcode, test_date, created, status, creator_type = product
             self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, created, status)
-
      
     # Creates the search section of the UI.
     def create_search_group(self):
@@ -392,7 +390,7 @@ class ProductManager(QMainWindow):
         search_layout.addStretch()
 
         self.search_combo = QComboBox()
-        self.search_combo.addItems(["Select", "ID", "Name", "Category", "Description"])
+        self.search_combo.addItems(["Select", "ID", "Name", "Category", "Description", "Status: Approved", "Status: Rejected", "Status: Pending"])
         self.search_combo.setStyleSheet("""
             QComboBox {padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 100px;}""")
         search_layout.addWidget(self.search_combo)
@@ -442,7 +440,6 @@ class ProductManager(QMainWindow):
         
         self.search_button.clicked.connect(self.search_products)
         self.show_all_button.clicked.connect(self.show_all_products)
-
 
 
      # Shows date picker for test date selection.
@@ -504,7 +501,6 @@ class ProductManager(QMainWindow):
             self.show_message("Error", "Please enter a valid calendar date", QMessageBox.Warning)
             return False
         
-
     
     # Validates email format.
     def validate_email(self, email):
@@ -549,7 +545,6 @@ class ProductManager(QMainWindow):
         msg.setText(message)
         msg.setIcon(icon) 
         msg.exec_()
-
 
 
     # Creates the product details form.   
@@ -660,7 +655,6 @@ class ProductManager(QMainWindow):
         self.product_details_group.setLayout(main_layout)
 
 
-
     
     # Creates products table.
     def create_table(self):
@@ -713,8 +707,6 @@ class ProductManager(QMainWindow):
         self.table.setTextElideMode(Qt.ElideRight)
         self.table.cellClicked.connect(self.show_product_details)
         self.table.cellDoubleClicked.connect(self.show_barcode_popup)
-
-
 
 
     # Creates action buttons (Save, Update, Delete, etc.).            
@@ -860,12 +852,24 @@ class ProductManager(QMainWindow):
         self.table.setItem(row_position, 9, status_item)
 
 
+    
+
 
     def approve_product(self):
         selected_rows = {index.row() for index in self.table.selectedIndexes()}
         
         if not selected_rows:
             self.show_message("Error", "No rows selected", QMessageBox.Warning)
+            return
+
+        # Check if any selected product is already approved or rejected
+        for row in sorted(selected_rows):
+            status_item = self.table.item(row, 9)
+            current_status = status_item.text()
+        if current_status in ["Approved", "Rejected"]:
+            self.show_message("Error", 
+                           f"Cannot change status - product is already {current_status}", 
+                           QMessageBox.Warning)
             return
             
         reply = QMessageBox.question(self, "Confirm Approval", 
@@ -892,6 +896,16 @@ class ProductManager(QMainWindow):
         if not selected_rows:
             self.show_message("Error", "No rows selected", QMessageBox.Warning)
             return
+
+        # Check if any selected product is already approved or rejected
+        for row in sorted(selected_rows):
+            status_item = self.table.item(row, 9)
+            current_status = status_item.text()
+            if current_status in ["Approved", "Rejected"]:
+                self.show_message("Error", 
+                           f"Cannot change status - product is already {current_status}", 
+                           QMessageBox.Warning)
+                return
             
         reply = QMessageBox.question(self, "Confirm Rejection", 
                                    f"Reject {len(selected_rows)} selected product(s)?",
@@ -910,8 +924,6 @@ class ProductManager(QMainWindow):
                     status_item.setBackground(Qt.red)  # Set red background
                 except Error as e:
                     self.show_message("Error", f"Failed to reject product: {str(e)}", QMessageBox.Critical)
-
-
 
 
         # Saves a new product to database.
@@ -975,8 +987,6 @@ class ProductManager(QMainWindow):
             
         except Exception as e:
             self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
-
-
 
 
     # Updates an existing product.
@@ -1085,7 +1095,6 @@ class ProductManager(QMainWindow):
 
 
 
-
     # Deletes selected products.
     def delete_product(self):
         selected_rows = {index.row() for index in self.table.selectedIndexes()}
@@ -1158,38 +1167,47 @@ class ProductManager(QMainWindow):
             
         search_term = self.search_input.text().strip()
         
-        if not search_term:
+        # For status searches, we don't need a search term
+        if not search_term and not search_type.startswith("Status:"):
             self.show_message("Error", "Please enter search term", QMessageBox.Warning)
             return
-        
-        products = self.db.search_products(search_type, search_term)
         
         # Clear current filters
         for row in range(self.table.rowCount()):
             self.table.setRowHidden(row, False)
-        
-        # If searching by something other than date, filter the table
-        if search_type != "Date Range":
+
+
+        if search_type.startswith("Status:"):
+            status = search_type.split(":")[1].strip()
             for row in range(self.table.rowCount()):
-                match = False
-                if search_type == "ID":
-                    item = self.table.item(row, 0)
-                    if item and search_term == item.text():
-                        match = True
-                elif search_type == "Name":
-                    item = self.table.item(row, 2)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                elif search_type == "Category":
-                    item = self.table.item(row, 1)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                elif search_type == "Description":
-                    item = self.table.item(row, 3)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
+                status_item = self.table.item(row, 9)  # Status column
+                if status_item and status_item.text() != status:
+                    self.table.setRowHidden(row, True)
+        else:
+            products = self.db.search_products(search_type, search_term)
+            
+            # If searching by something other than date, filter the table
+            if search_type != "Date Range":
+                for row in range(self.table.rowCount()):
+                    match = False
+                    if search_type == "ID":
+                        item = self.table.item(row, 0)
+                        if item and search_term == item.text():
+                            match = True
+                    elif search_type == "Name":
+                        item = self.table.item(row, 2)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
+                    elif search_type == "Category":
+                        item = self.table.item(row, 1)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
+                    elif search_type == "Description":
+                        item = self.table.item(row, 3)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
                 
-                self.table.setRowHidden(row, not match)
+                    self.table.setRowHidden(row, not match)
 
 
 
@@ -1224,7 +1242,7 @@ class ProductManager(QMainWindow):
                 self.popup = BarcodePopup(barcode_path, self)
                 self.popup.show()
 
-  
+
 
     # Exports table data to Excel with barcode images.    
     def export_to_excel(self):
@@ -1372,6 +1390,8 @@ class ProductManager(QMainWindow):
         except Exception as e:
             self.show_message("Error", f"Export failed: {str(e)}", QMessageBox.Critical)
 
+
+   
     # Resets table to show all products.
     def show_all_products(self):
         """Show all rows and clear search"""
