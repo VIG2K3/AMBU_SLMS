@@ -1292,10 +1292,35 @@ class ProductManager(QMainWindow):
                 worksheet.column_dimensions['G'].width = 30  # Barcode (wider for image)
                 worksheet.column_dimensions['H'].width = 12  # Test Date
                 worksheet.column_dimensions['I'].width = 12  # Created
+                worksheet.column_dimensions['J'].width = 12  # Status
 
-                # Set row heights for rows with images
-                from openpyxl.styles import Alignment
+
+                from openpyxl.styles import PatternFill, Font, Alignment
                 wrap_alignment = Alignment(wrap_text=True, vertical='top')
+                from openpyxl.styles.colors import Color
+
+                # Define the fill colors
+                approved_fill = PatternFill(start_color='4CAF50', end_color='4CAF50', fill_type='solid')
+                rejected_fill = PatternFill(start_color='F44336', end_color='F44336', fill_type='solid')
+                pending_fill = PatternFill(start_color='FE9705', end_color='FE9705', fill_type='solid')
+
+                # Define white font for better visibility
+                white_font = Font(color='FFFFFF')
+
+                # Apply status colors
+                for row_idx, row_data in enumerate(data, start=2):
+                    status_cell = worksheet[f'J{row_idx}']  # Status column is J
+                    status = status_cell.value
+                
+                    if status == "Approved":
+                        status_cell.fill = approved_fill
+                        status_cell.font = white_font
+                    elif status == "Rejected":
+                        status_cell.fill = rejected_fill
+                        status_cell.font = white_font
+                    elif status == "Pending":
+                        status_cell.fill = pending_fill
+                        status_cell.font = white_font
 
                 for row_idx in range(2, len(data)+2):  # Start from row 2 (skip header)
                     worksheet.row_dimensions[row_idx].height = 60  # Default height
