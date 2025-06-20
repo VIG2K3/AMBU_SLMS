@@ -16,7 +16,7 @@ from datetime import datetime
 
 class DatabaseManager:
     # Initializes the database connection and creates tables.
-    def __init__(self, db_file="ProductUser.db"):
+    def __init__(self, db_file="Product.db"):
         self.db_file = db_file
         self.create_connection()
         self.create_tables()
@@ -87,33 +87,6 @@ class DatabaseManager:
             c.execute(sql, tuple(product_data))
             self.conn.commit()
             return c.lastrowid
-        except Error as e:
-            print(e)
-            return None
-        
-    # Updates an existing product in the database.
-    def update_product(self, product):
-        """Update an existing product"""
-        # Convert product tuple to list for modification
-        product_data = list(product)
-        
-        # Process supplier emails if present (index 4 in the tuple)
-        if len(product_data) > 4 and product_data[4]:
-            product_data[4] = self._process_emails(product_data[4])
-
-        # Process description if empty (index 2 in the tuple)
-        if len(product_data) > 2 and not product_data[2]:
-            product_data[2] = None
-        
-        sql = '''UPDATE products
-                 SET category = ?, name = ?, description = ?, quantity = ?, 
-                     supplier_email = ?, test_date = ?, status = ?
-                 WHERE id = ?'''
-        try:
-            c = self.conn.cursor()
-            c.execute(sql, tuple(product_data))
-            self.conn.commit()
-            return c.rowcount
         except Error as e:
             print(e)
             return None
@@ -401,7 +374,7 @@ class ProductManager(QMainWindow):
      
     # Creates the search section of the UI.
     def create_search_group(self):
-        self.search_group = QGroupBox("Search Products")
+        self.search_group = QGroupBox("SEARCH PRODUCTS")
         self.search_group.setStyleSheet("""
             QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
@@ -575,7 +548,7 @@ class ProductManager(QMainWindow):
 
     # Creates the product details form.   
     def create_product_form(self):
-        self.product_details_group = QGroupBox("Product Details")
+        self.product_details_group = QGroupBox("PRODUCT DETAILS")
         self.product_details_group.setStyleSheet("""
             QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
@@ -658,7 +631,7 @@ class ProductManager(QMainWindow):
         expiry_layout.addWidget(self.calendar_button)
         expiry_layout.setSpacing(5)
 
-        supplier_email_label = QLabel("SUPPLIER EMAIL:")
+        supplier_email_label = QLabel("EMAIL:")
         supplier_email_label.setFont(label_font)
         self.supplier_email_input = QLineEdit()
         self.supplier_email_input.setPlaceholderText("email1@example.com, email2@domain.com")
@@ -686,7 +659,7 @@ class ProductManager(QMainWindow):
         self.table.setColumnCount(10)
         self.table.setHorizontalHeaderLabels([
             "PRODUCT ID", "PRODUCT CATEGORY", "PRODUCT NAME", "DESCRIPTION",
-            "QUANTITY", "SUPPLIER EMAIL", "BARCODE", 
+            "QUANTITY", "EMAIL", "BARCODE", 
             "TEST DATE", "CREATED DATE", "STATUS"
         ])
         
@@ -746,11 +719,10 @@ class ProductManager(QMainWindow):
         first_row_layout.addStretch()
     
         self.save_button = QPushButton("Save")
-        self.update_button = QPushButton("Update")
         self.delete_button = QPushButton("Delete")
         self.clear_button = QPushButton("Clear")
     
-        for btn in [self.save_button, self.update_button, self.delete_button, self.clear_button]:
+        for btn in [self.save_button, self.delete_button, self.clear_button]:
             btn.setStyleSheet(button_style)
             btn.setFixedHeight(35)
             btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -761,7 +733,6 @@ class ProductManager(QMainWindow):
         container_layout.addWidget(first_row_container)
     
         self.save_button.clicked.connect(self.save_product)
-        self.update_button.clicked.connect(self.update_product)
         self.delete_button.clicked.connect(self.delete_product)
         self.clear_button.clicked.connect(self.clear_fields)
 
@@ -866,77 +837,7 @@ class ProductManager(QMainWindow):
             
         except Exception as e:
             self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
-
-            # Updates an existing product.
-    def update_product(self):
-        try:
-            selected = self.table.selectedItems()
-            if not selected:
-                self.show_message("Error", "Please select a row to update", QMessageBox.Warning)
-                return
             
-            reply = QMessageBox.question(self, "Confirm Update","Are you sure you want to update this product?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            
-            if reply != QMessageBox.Yes:
-                return
-            
-            row = selected[0].row()
-            product_id = int(self.table.item(row, 0).text())
-            category = self.category_input.text().strip()
-            name = self.name_input.text().strip()
-            description = self.description_input.toPlainText().strip()
-            qty = self.quantity_input.text().strip()
-            test_date = self.expiry_date_input.text().strip()
-            supplier_email = self.supplier_email_input.text().strip()
-            status = self.table.item(row, 9).text()  # Get status from table
-            
-            if not category:
-                self.show_message("Error", "Please enter a category", QMessageBox.Warning)
-                return
-                
-            if not name:
-                self.show_message("Error", "Product name cannot be empty", QMessageBox.Warning)
-                return
-                
-            if not qty or not qty.isdigit():
-                self.show_message("Error", "Please enter a valid quantity", QMessageBox.Warning)
-                return
-            
-            if not self.validate_date(test_date):
-                return  # Validation will show appropriate error
-            
-            if not supplier_email:
-                self.show_message("Error", "Supplier email is required", QMessageBox.Warning)
-                return
-            
-            if supplier_email and not self.validate_email(supplier_email):
-                self.show_message("Error", 
-                        "Please enter valid email address(es)\n"
-                        "Multiple emails should be comma-separated\n"
-                        "Example: supplier1@example.com, supplier2@domain.com",
-                    QMessageBox.Warning)
-                return
-            
-            product = (category, name, description, int(qty), supplier_email if supplier_email else None, 
-                       test_date if test_date else None, status, product_id)
-            updated_rows = self.db.update_product(product)
-            
-            if updated_rows:
-                self.table.item(row, 1).setText(category)
-                self.table.item(row, 2).setText(name)
-                self.table.item(row, 3).setText(description)
-                self.table.item(row, 4).setText(qty)
-                self.table.item(row, 5).setText(supplier_email)
-                self.table.item(row, 7).setText(test_date)
-                
-                self.clear_fields()
-                self.show_message("Success", "Product updated successfully!")
-            else:
-                self.show_message("Error", "Failed to update product in database", QMessageBox.Critical)
-                
-        except Exception as e:
-            self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
-
     # Deletes selected products.
     def delete_product(self):
         selected_rows = {index.row() for index in self.table.selectedIndexes()}
