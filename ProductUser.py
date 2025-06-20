@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QComboBox, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
                             QGroupBox, QFormLayout, QDialog, QSplitter, QMessageBox, QFileDialog,
                             QDateEdit, QCalendarWidget, QStyle, QHeaderView, QSizePolicy, QTextEdit)
-from PyQt5.QtGui import QPixmap, QFont
+from PyQt5.QtGui import QColor, QPixmap, QFont
 from PyQt5.QtCore import Qt, QDate
 from datetime import datetime
 
@@ -35,17 +35,18 @@ class DatabaseManager:
     def create_tables(self):
         """Create the products table if it doesn't exist"""
         sql_create_products_table = """CREATE TABLE IF NOT EXISTS products (
-                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        category TEXT NOT NULL,
-                                        name TEXT NOT NULL,
-                                        description TEXT,
-                                        quantity INTEGER NOT NULL,
-                                        supplier_email TEXT NOT NULL,
-                                        barcode TEXT UNIQUE,
-                                        test_date TEXT,
-                                        created_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                                        status TEXT NOT NULL
-                                    );"""
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    category TEXT NOT NULL,
+                                    name TEXT NOT NULL,
+                                    description TEXT,
+                                    quantity INTEGER NOT NULL,
+                                    supplier_email TEXT NOT NULL,
+                                    barcode TEXT UNIQUE,
+                                    test_date TEXT,
+                                    created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                                    status TEXT NOT NULL DEFAULT 'Pending',
+                                    creator_type TEXT NOT NULL 
+                                );"""
         
         try:
             c = self.conn.cursor()
@@ -80,11 +81,13 @@ class DatabaseManager:
             product_data[2] = None
         
         sql = '''INSERT INTO products(category, name, description, quantity, 
-                 supplier_email, barcode, test_date, status)
-                 VALUES(?,?,?,?,?,?,?,?)'''
+                 supplier_email, barcode, test_date, status, creator_type)
+                 VALUES(?,?,?,?,?,?,?,?,?)'''
         try:
             c = self.conn.cursor()
-            c.execute(sql, tuple(product_data))
+             # Add 'user' as the creator_type
+            product_with_creator = tuple(product_data) + ('user',)
+            c.execute(sql, product_with_creator)
             self.conn.commit()
             return c.lastrowid
         except Error as e:
@@ -109,7 +112,7 @@ class DatabaseManager:
         """Query all products from the database"""
         try:
             c = self.conn.cursor()
-            c.execute("SELECT * FROM products ORDER BY id")
+            c.execute("SELECT * FROM products WHERE creator_type = 'user' ORDER BY id")
             return c.fetchall()
         except Error as e:
             print(e)
@@ -135,15 +138,16 @@ class DatabaseManager:
         """Search products based on type and term"""
         try:
             c = self.conn.cursor()
+            base_query = "SELECT * FROM products WHERE creator_type = 'user' AND "
             
             if search_type == "ID":
-                c.execute("SELECT * FROM products WHERE id = ?", (search_term,))
+                c.execute(base_query + "id = ?", (search_term,))
             elif search_type == "Name":
-                c.execute("SELECT * FROM products WHERE name LIKE ?", (f'%{search_term}%',))
+                c.execute(base_query + "name LIKE ?", (f'%{search_term}%',))
             elif search_type == "Category":
-                c.execute("SELECT * FROM products WHERE category LIKE ?", (f'%{search_term}%',))
+                c.execute(base_query + "category LIKE ?", (f'%{search_term}%',))
             elif search_type == "Description":
-                c.execute("SELECT * FROM products WHERE description LIKE ?", (f'%{search_term}%',))
+                c.execute(base_query + "description LIKE ?", (f'%{search_term}%',))
             else:
                 return []
                 
@@ -369,7 +373,7 @@ class ProductManager(QMainWindow):
         products = self.db.get_all_products()
         
         for product in products:
-            pid, category, name, description, qty, supplier_email, barcode, test_date, created, status = product
+            pid, category, name, description, qty, supplier_email, barcode, test_date, created, status, creator_type = product
             self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, status, created)
      
     # Creates the search section of the UI.
@@ -667,7 +671,10 @@ class ProductManager(QMainWindow):
             QTableWidget {background-color: white; alternate-background-color: #f7f7f7; gridline-color: #e0e0e0; font-size: 12px;}
             QHeaderView::section {background-color: #f0f0f0; padding: 8px; border: 1px solid #d0d0d0; font-weight: bold;text-align: center;}
             QTableWidget::item {padding: 5px;}
-            QTableWidget::item:selected {background-color: #a0c0e0; color: black;}""")
+            QTableWidget::item:selected {background-color: #a0c0e0; color: black;}
+            QTableWidget::item[status="Approved"] {background-color: #4CAF50; color: white;}
+            QTableWidget::item[status="Rejected"] {background-color: #f44336; color: white;}
+            QTableWidget::item[status="Pending"] {background-color: #FE9705; color: white;}""")
         
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -774,6 +781,23 @@ class ProductManager(QMainWindow):
         self.table.setItem(row_position, 7, create_centered_item(test_date))
         self.table.setItem(row_position, 8, create_centered_item(created_date))
         self.table.setItem(row_position, 9, create_centered_item(status))
+        
+        # Status item with color
+        status_item = QTableWidgetItem(str(status))
+        status_item.setTextAlignment(Qt.AlignCenter)
+        status_item.setFlags(status_item.flags() & ~Qt.ItemIsEditable)
+    
+        # Set background color based on status
+        if status == "Approved":
+            status_item.setBackground(Qt.green)
+        elif status == "Rejected":
+            status_item.setBackground(Qt.red)
+        elif status == "Pending":
+            status_item.setBackground(QColor("#FE9705"))  # Orange color
+            
+        self.table.setItem(row_position, 9, status_item)
+
+        
 
         # Saves a new product to database.
     def save_product(self):
@@ -784,7 +808,7 @@ class ProductManager(QMainWindow):
             qty = self.quantity_input.text().strip()
             test_date = self.expiry_date_input.text().strip()
             supplier_email = self.supplier_email_input.text().strip()
-            status = "Active"  # Default status
+            status = "Pending"  # Default status
             
             if not category:
                 self.show_message("Error", "Please enter a category", QMessageBox.Warning)
