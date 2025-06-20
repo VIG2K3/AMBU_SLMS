@@ -394,9 +394,8 @@ class ProductManager(QMainWindow):
         search_layout.addStretch()
 
         self.search_combo = QComboBox()
-        self.search_combo.addItems(["Select", "ID", "Name", "Category", "Description"])
-        self.search_combo.setStyleSheet("""
-            QComboBox {padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 100px;}""")
+        self.search_combo.addItems(["Select", "ID", "Name", "Category", "Description", "Status: Approved", "Status: Rejected", "Status: Pending"])
+        self.search_combo.setStyleSheet("""QComboBox {padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 100px;}""")
         search_layout.addWidget(self.search_combo)
 
         search_input_container = QWidget()
@@ -870,6 +869,15 @@ class ProductManager(QMainWindow):
             self.show_message("Error", "No rows selected", QMessageBox.Warning)
             return
         
+        # Check if any selected product is approved
+        for row in selected_rows:
+            status_item = self.table.item(row, 9)  # Status column
+            if status_item and status_item.text() == "Approved":
+                self.show_message("Error", 
+                    "Cannot delete approved products. Please contact admin.", 
+                    QMessageBox.Warning)
+                return
+        
         reply = QMessageBox.question(
             self, "Confirm Delete", 
             f"Delete {len(selected_rows)} selected product(s)?",
@@ -921,38 +929,46 @@ class ProductManager(QMainWindow):
             
         search_term = self.search_input.text().strip()
         
-        if not search_term:
+         # For status searches, we don't need a search term
+        if not search_term and not search_type.startswith("Status:"):
             self.show_message("Error", "Please enter search term", QMessageBox.Warning)
             return
         
-        products = self.db.search_products(search_type, search_term)
-        
-        # Clear current filters
+         # Clear current filters
         for row in range(self.table.rowCount()):
             self.table.setRowHidden(row, False)
-        
-        # If searching by something other than date, filter the table
-        if search_type != "Date Range":
+
+        if search_type.startswith("Status:"):
+            status = search_type.split(":")[1].strip()
             for row in range(self.table.rowCount()):
-                match = False
-                if search_type == "ID":
-                    item = self.table.item(row, 0)
-                    if item and search_term == item.text():
-                        match = True
-                elif search_type == "Name":
-                    item = self.table.item(row, 2)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                elif search_type == "Category":
-                    item = self.table.item(row, 1)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                elif search_type == "Description":
-                    item = self.table.item(row, 3)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
+                status_item = self.table.item(row, 9)  # Status column
+                if status_item and status_item.text() != status:
+                    self.table.setRowHidden(row, True)
+        else:
+            products = self.db.search_products(search_type, search_term)
+        
+            # If searching by something other than date, filter the table
+            if search_type != "Date Range":
+                for row in range(self.table.rowCount()):
+                    match = False
+                    if search_type == "ID":
+                        item = self.table.item(row, 0)
+                        if item and search_term == item.text():
+                            match = True
+                    elif search_type == "Name":
+                        item = self.table.item(row, 2)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
+                    elif search_type == "Category":
+                        item = self.table.item(row, 1)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
+                    elif search_type == "Description":
+                        item = self.table.item(row, 3)
+                        if item and search_term.lower() in item.text().lower():
+                            match = True
                 
-                self.table.setRowHidden(row, not match)
+                    self.table.setRowHidden(row, not match)
 
     # Shows product details when row is clicked.  
     def show_product_details(self, row, column):
