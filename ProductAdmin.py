@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QComboBox, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
                             QGroupBox, QFormLayout, QDialog, QSplitter, QMessageBox, QFileDialog,
                             QDateEdit, QCalendarWidget, QStyle, QHeaderView, QSizePolicy, QTextEdit)
-from PyQt5.QtGui import QPixmap, QFont
+from PyQt5.QtGui import QColor, QPixmap, QFont
 from PyQt5.QtCore import Qt, QDate
 from datetime import datetime
 import pandas as pd
@@ -21,7 +21,7 @@ from openpyxl.utils.units import pixels_to_EMU
 
 class DatabaseManager:
     # Initializes the database connection and creates tables.
-    def __init__(self, db_file="ProductAdmin.db"):
+    def __init__(self, db_file="Product.db"):
         self.db_file = db_file
         self.create_connection()
         self.create_tables()
@@ -40,16 +40,18 @@ class DatabaseManager:
     def create_tables(self):
         """Create the products table if it doesn't exist"""
         sql_create_products_table = """CREATE TABLE IF NOT EXISTS products (
-                                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                        category TEXT NOT NULL,
-                                        name TEXT NOT NULL,
-                                        description TEXT,
-                                        quantity INTEGER NOT NULL,
-                                        supplier_email TEXT NOT NULL,
-                                        barcode TEXT UNIQUE,
-                                        test_date TEXT,
-                                        created_date TEXT DEFAULT CURRENT_TIMESTAMP
-                                    );"""
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    category TEXT NOT NULL,
+                                    name TEXT NOT NULL,
+                                    description TEXT,
+                                    quantity INTEGER NOT NULL,
+                                    supplier_email TEXT NOT NULL,
+                                    barcode TEXT UNIQUE,
+                                    test_date TEXT,
+                                    created_date TEXT DEFAULT CURRENT_TIMESTAMP,
+                                    status TEXT NOT NULL DEFAULT 'Pending',
+                                    creator_type TEXT NOT NULL  # Add this line
+                                );"""
         
         try:
             c = self.conn.cursor()
@@ -72,13 +74,31 @@ class DatabaseManager:
     # Inserts a new product into the database.
     def add_product(self, product):
         """Add a new product to the products table"""
-        sql = '''INSERT INTO products(category, name, description, quantity, supplier_email, barcode, test_date)
-                 VALUES(?,?,?,?,?,?,?)'''
+        sql = '''INSERT INTO products(category, name, description, quantity, supplier_email, barcode, test_date, creator_type)
+                 VALUES(?,?,?,?,?,?,?,?)'''
+        try:
+            c = self.conn.cursor()
+            # Add 'admin' as the creator_type
+            product_with_creator = product + ('admin',)
+            c.execute(sql, product_with_creator)
+            self.conn.commit()
+            return c.lastrowid
+        except Error as e:
+            print(e)
+            return None
+        
+
+    # Updates an existing product in the database.
+    def update_product(self, product):
+        """Update an existing product"""
+        sql = '''UPDATE products
+                 SET category = ?, name = ?, description = ?, quantity = ?, supplier_email = ?, barcode = ?, test_date = ?
+                 WHERE id = ?'''
         try:
             c = self.conn.cursor()
             c.execute(sql, product)
             self.conn.commit()
-            return c.lastrowid
+            return c.rowcount
         except Error as e:
             print(e)
             return None
@@ -340,6 +360,9 @@ class ProductManager(QMainWindow):
         self.create_buttons()
         self.main_layout.addWidget(self.buttons_container)
         self.load_products_from_db()
+
+
+
     
     # Loads all products from database into the table.
     def load_products_from_db(self):
@@ -347,8 +370,9 @@ class ProductManager(QMainWindow):
         products = self.db.get_all_products()
         
         for product in products:
-            pid, category, name, description, qty, supplier_email, barcode, test_date, created = product
-            self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, created)
+            pid, category, name, description, qty, supplier_email, barcode, test_date, created, status, creator_type = product
+            self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, created, status)
+
      
     # Creates the search section of the UI.
     def create_search_group(self):
@@ -419,6 +443,8 @@ class ProductManager(QMainWindow):
         self.search_button.clicked.connect(self.search_products)
         self.show_all_button.clicked.connect(self.show_all_products)
 
+
+
      # Shows date picker for test date selection.
     def show_date_picker(self):
         dialog = DatePickerDialog(self)
@@ -456,7 +482,6 @@ class ProductManager(QMainWindow):
                     self.table.setRowHidden(row, True)
     
     # Validates date format (DD-MM-YYYY).
-    # Validates date format (DD-MM-YYYY).
     def validate_date(self, date_str):
         if not date_str.strip():
             self.show_message("Error", "Test date cannot be blank", QMessageBox.Warning)
@@ -478,6 +503,8 @@ class ProductManager(QMainWindow):
         except ValueError:
             self.show_message("Error", "Please enter a valid calendar date", QMessageBox.Warning)
             return False
+        
+
     
     # Validates email format.
     def validate_email(self, email):
@@ -522,6 +549,8 @@ class ProductManager(QMainWindow):
         msg.setText(message)
         msg.setIcon(icon) 
         msg.exec_()
+
+
 
     # Creates the product details form.   
     def create_product_form(self):
@@ -629,22 +658,28 @@ class ProductManager(QMainWindow):
         form_container.setLayout(form_layout)
         main_layout.addWidget(form_container)
         self.product_details_group.setLayout(main_layout)
+
+
+
     
     # Creates products table.
     def create_table(self):
         self.table = QTableWidget()
-        self.table.setColumnCount(9)
+        self.table.setColumnCount(10)
         self.table.setHorizontalHeaderLabels([
             "PRODUCT ID", "PRODUCT CATEGORY", "PRODUCT NAME", "DESCRIPTION",
             "QUANTITY", "EMAIL", "BARCODE", 
-            "TEST DATE", "CREATED DATE"
+            "TEST DATE", "CREATED DATE", "STATUS"
         ])
         
         self.table.setStyleSheet("""
             QTableWidget {background-color: white; alternate-background-color: #f7f7f7; gridline-color: #e0e0e0; font-size: 12px;}
             QHeaderView::section {background-color: #f0f0f0; padding: 8px; border: 1px solid #d0d0d0; font-weight: bold;text-align: center;}
             QTableWidget::item {padding: 5px;}
-            QTableWidget::item:selected {background-color: #a0c0e0; color: black;}""")
+            QTableWidget::item:selected {background-color: #a0c0e0; color: black;}
+            QTableWidget::item[status="Approved"] {background-color: #4CAF50; color: white;}
+            QTableWidget::item[status="Rejected"] {background-color: #f44336; color: white;}
+            QTableWidget::item[status="Pending"] {background-color: #FE9705; color: white;}""")
         
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -666,6 +701,7 @@ class ProductManager(QMainWindow):
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Barcode
         header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Test Date
         header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Created
+        header.setSectionResizeMode(9, QHeaderView.ResizeToContents)  # Status
 
         self.table.setColumnWidth(1, 150)  # Category
         self.table.setColumnWidth(2, 200)  # Name
@@ -678,6 +714,9 @@ class ProductManager(QMainWindow):
         self.table.cellClicked.connect(self.show_product_details)
         self.table.cellDoubleClicked.connect(self.show_barcode_popup)
 
+
+
+
     # Creates action buttons (Save, Update, Delete, etc.).            
     def create_buttons(self):
         self.buttons_container = QWidget()
@@ -685,9 +724,36 @@ class ProductManager(QMainWindow):
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(15)
         
-        button_style = """QPushButton {background-color: #b60338; color: #d9d9d9; border: 1px solid #ccc; border-radius: 4px; padding: 8px 85px; min-width: 100px; font-weight: bold;}
+        button_style = """QPushButton {background-color: #b60338; color: #d9d9d9; border: 1px solid #ccc; border-radius: 4px; padding: 8px 50px; min-width: 100px; font-weight: bold;}
                          QPushButton:hover {background-color: #f31659;}
                          QPushButton:pressed {background-color: #ff4757;}"""
+        
+
+        approve_reject_style = """QPushButton {background-color: #4CAF50; color: white; border: 1px solid #ccc; border-radius: 4px; padding: 8px 30px; min-width: 100px; font-weight: bold;}
+                                 QPushButton:hover {background-color: #45a049;}
+                                 QPushButton:pressed {background-color: #3e8e41;}"""
+        reject_style = """QPushButton {background-color: #f44336; color: white; border: 1px solid #ccc; border-radius: 4px; padding: 8px 30px; min-width: 100px; font-weight: bold;}
+                          QPushButton:hover {background-color: #d32f2f;}
+                          QPushButton:pressed {background-color: #b71c1c;}"""
+    
+        # First row - Approve/Reject buttons
+        approval_row = QWidget()
+        approval_layout = QHBoxLayout(approval_row)
+        approval_layout.setContentsMargins(0, 0, 0, 0)
+        approval_layout.addStretch()
+        
+        self.approve_button = QPushButton("Approve")
+        self.approve_button.setStyleSheet(approve_reject_style)
+        self.approve_button.setFixedHeight(35)
+        
+        self.reject_button = QPushButton("Reject")
+        self.reject_button.setStyleSheet(reject_style)
+        self.reject_button.setFixedHeight(35)
+        
+        approval_layout.addWidget(self.approve_button)
+        approval_layout.addWidget(self.reject_button)
+        approval_layout.addStretch()
+
 
         first_row_container = QWidget()
         first_row_layout = QHBoxLayout(first_row_container)
@@ -695,10 +761,11 @@ class ProductManager(QMainWindow):
         first_row_layout.addStretch()
     
         self.save_button = QPushButton("Save")
+        self.update_button = QPushButton("Update")
         self.delete_button = QPushButton("Delete")
         self.clear_button = QPushButton("Clear")
     
-        for btn in [self.save_button, self.delete_button, self.clear_button]:
+        for btn in [self.save_button, self.update_button, self.delete_button, self.clear_button]:
             btn.setStyleSheet(button_style)
             btn.setFixedHeight(35)
             btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -723,16 +790,23 @@ class ProductManager(QMainWindow):
         second_row_layout.addWidget(self.export_excel_button)
         second_row_layout.addStretch()
 
+        container_layout.addWidget(approval_row)
         container_layout.addWidget(first_row_container)
         container_layout.addWidget(second_row_container)
     
         self.save_button.clicked.connect(self.save_product)
+        self.update_button.clicked.connect(self.update_product)
         self.delete_button.clicked.connect(self.delete_product)
         self.clear_button.clicked.connect(self.clear_fields)
         self.export_excel_button.clicked.connect(self.export_to_excel)
+        self.approve_button.clicked.connect(self.approve_product)
+        self.reject_button.clicked.connect(self.reject_product)
+
+
+
 
         # Adds a row to the table.
-    def add_table_row(self, pid, category, name, description, qty, supplier_email="", barcode="", test_date="", created_date=None):
+    def add_table_row(self, pid, category, name, description, qty, supplier_email="", barcode="", test_date="", created_date=None, status="Pending"):
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
         
@@ -768,6 +842,77 @@ class ProductManager(QMainWindow):
         self.table.setItem(row_position, 6, create_left_item(barcode))
         self.table.setItem(row_position, 7, create_centered_item(test_date))
         self.table.setItem(row_position, 8, create_centered_item(created_date))
+        self.table.setItem(row_position, 9, create_centered_item(status))
+
+        # Status item with color
+        status_item = QTableWidgetItem(str(status))
+        status_item.setTextAlignment(Qt.AlignCenter)
+        status_item.setFlags(status_item.flags() & ~Qt.ItemIsEditable)
+    
+        # Set background color based on status
+        if status == "Approved":
+            status_item.setBackground(Qt.green)
+        elif status == "Rejected":
+            status_item.setBackground(Qt.red)
+        elif status == "Pending":
+            status_item.setBackground(QColor("#FE9705"))  # Orange color
+            
+        self.table.setItem(row_position, 9, status_item)
+
+
+
+    def approve_product(self):
+        selected_rows = {index.row() for index in self.table.selectedIndexes()}
+        
+        if not selected_rows:
+            self.show_message("Error", "No rows selected", QMessageBox.Warning)
+            return
+            
+        reply = QMessageBox.question(self, "Confirm Approval", 
+                                   f"Approve {len(selected_rows)} selected product(s)?",
+                                   QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            for row in sorted(selected_rows):
+                product_id = int(self.table.item(row, 0).text())
+                try:
+                    c = self.db.conn.cursor()
+                    c.execute("UPDATE products SET status = 'Approved' WHERE id = ?", (product_id,))
+                    self.db.conn.commit()
+                    # Update both text and color
+                    status_item = self.table.item(row, 9)
+                    status_item.setText("Approved")
+                    status_item.setBackground(Qt.green)  # Set green background
+                except Error as e:
+                    self.show_message("Error", f"Failed to approve product: {str(e)}", QMessageBox.Critical)
+
+    def reject_product(self):
+        selected_rows = {index.row() for index in self.table.selectedIndexes()}
+        
+        if not selected_rows:
+            self.show_message("Error", "No rows selected", QMessageBox.Warning)
+            return
+            
+        reply = QMessageBox.question(self, "Confirm Rejection", 
+                                   f"Reject {len(selected_rows)} selected product(s)?",
+                                   QMessageBox.Yes | QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            for row in sorted(selected_rows):
+                product_id = int(self.table.item(row, 0).text())
+                try:
+                    c = self.db.conn.cursor()
+                    c.execute("UPDATE products SET status = 'Rejected' WHERE id = ?", (product_id,))
+                    self.db.conn.commit()
+                    # Update both text and color
+                    status_item = self.table.item(row, 9)
+                    status_item.setText("Rejected")
+                    status_item.setBackground(Qt.red)  # Set red background
+                except Error as e:
+                    self.show_message("Error", f"Failed to reject product: {str(e)}", QMessageBox.Critical)
+
+
+
 
         # Saves a new product to database.
     def save_product(self):
@@ -831,6 +976,116 @@ class ProductManager(QMainWindow):
         except Exception as e:
             self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
 
+
+
+
+    # Updates an existing product.
+    def update_product(self):
+        try:
+            selected = self.table.selectedItems()
+            if not selected:
+                self.show_message("Error", "Please select a row to update", QMessageBox.Warning)
+                return
+            
+            row = selected[0].row()
+            status_item = self.table.item(row, 9)  # Status column
+
+             # Check if product status is not "Pending"
+            if status_item.text() != "Pending":
+                self.show_message("Error", "Can only update products with 'Pending' status", QMessageBox.Warning)
+                return
+            
+            reply = QMessageBox.question(self, "Confirm Update","Are you sure you want to update this product?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            
+            if reply != QMessageBox.Yes:
+                return
+            
+            row = selected[0].row()
+            product_id = int(self.table.item(row, 0).text())
+            old_name = self.table.item(row, 2).text()  # Current product name
+            old_barcode_path = self.table.item(row, 6).text()  # Current barcode path
+            category = self.category_input.text().strip()
+            new_name = self.name_input.text().strip()
+            description = self.description_input.toPlainText().strip()
+            qty = self.quantity_input.text().strip()
+            test_date = self.expiry_date_input.text().strip()
+            supplier_email = self.supplier_email_input.text().strip()
+            
+            if not category:
+                self.show_message("Error", "Please enter a category", QMessageBox.Warning)
+                return
+                
+            if not new_name:
+                self.show_message("Error", "Product name cannot be empty", QMessageBox.Warning)
+                return
+                
+            if not qty or not qty.isdigit():
+                self.show_message("Error", "Please enter a valid quantity", QMessageBox.Warning)
+                return
+            
+            if test_date and not self.validate_date(test_date):
+                self.show_message("Error", "Please enter date in DD-MM-YYYY format (e.g. 30-05-2025)", QMessageBox.Warning)
+                return
+            
+            if supplier_email and not self.validate_email(supplier_email):
+                self.show_message("Error", 
+                    "Please enter a valid email address\n"
+                    "Example: supplier@example.com", 
+                    QMessageBox.Warning)
+                return
+
+            # Handle barcode file renaming if product name changed
+            new_barcode_path = old_barcode_path
+            if new_name != old_name and old_barcode_path and os.path.exists(old_barcode_path):
+                try:
+                    # Get directory and barcode number from old path
+                    dir_name = os.path.dirname(old_barcode_path)
+                    barcode_num = os.path.basename(old_barcode_path).split('_')[-1].split('.')[0]
+
+                    # Create new safe filename
+                    safe_new_name = "".join(c if c.isalnum() else "_" for c in new_name)
+                    new_filename = f"{safe_new_name}_{barcode_num}.png"
+                    new_barcode_path = os.path.join(dir_name, new_filename)
+                
+                    # Rename the files
+                    os.rename(old_barcode_path, new_barcode_path)
+
+                    # Also rename the .pnm file if it exists
+                    pnm_old = old_barcode_path.replace('.png', '.pnm')
+                    pnm_new = new_barcode_path.replace('.png', '.pnm')
+                    if os.path.exists(pnm_old):
+                        os.rename(pnm_old, pnm_new)
+
+                except Exception as e:
+                    self.show_message("Warning", 
+                                f"Product updated but could not rename barcode file: {str(e)}",
+                                QMessageBox.Warning)
+                    new_barcode_path = old_barcode_path  # Keep old path if rename failed
+ 
+            product = (category, new_name, description, int(qty), supplier_email if supplier_email else None, new_barcode_path, test_date if test_date else None, product_id)
+            
+            updated_rows = self.db.update_product(product)
+            
+            if updated_rows:
+                self.table.item(row, 1).setText(category)
+                self.table.item(row, 2).setText(new_name)
+                self.table.item(row, 3).setText(description)
+                self.table.item(row, 4).setText(qty)
+                self.table.item(row, 5).setText(supplier_email)
+                self.table.item(row, 6).setText(new_barcode_path)  # Updated barcode path
+                self.table.item(row, 7).setText(test_date)
+                
+                self.clear_fields()
+                self.show_message("Success", "Product updated successfully!")
+            else:
+                self.show_message("Error", "Failed to update product in database", QMessageBox.Critical)
+                
+        except Exception as e:
+            self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
+
+
+
+
     # Deletes selected products.
     def delete_product(self):
         selected_rows = {index.row() for index in self.table.selectedIndexes()}
@@ -838,6 +1093,15 @@ class ProductManager(QMainWindow):
         if not selected_rows:
             self.show_message("Error", "No rows selected", QMessageBox.Warning)
             return
+        
+        # Check if any selected product is pending approval
+        for row in selected_rows:
+            status_item = self.table.item(row, 9)  # Status column
+            if status_item and status_item.text() == "Pending":
+                self.show_message("Error", 
+                    "Cannot delete products with 'Pending' status. Approve or reject first.", 
+                    QMessageBox.Warning)
+                return
         
         reply = QMessageBox.question(
             self, "Confirm Delete", 
@@ -870,7 +1134,9 @@ class ProductManager(QMainWindow):
                     self.table.removeRow(row)
                 else:
                     self.show_message("Error", f"Failed to delete product ID {product_id}", QMessageBox.Critical)
-    
+
+
+
     # Clears the product form.
     def clear_fields(self):
         self.category_input.clear()
@@ -879,7 +1145,9 @@ class ProductManager(QMainWindow):
         self.quantity_input.clear()
         self.expiry_date_input.clear()
         self.supplier_email_input.clear()
-    
+
+
+
     # Searches products based on criteria.
     def search_products(self):
         search_type = self.search_combo.currentText()
@@ -923,6 +1191,8 @@ class ProductManager(QMainWindow):
                 
                 self.table.setRowHidden(row, not match)
 
+
+
     # Shows product details when row is clicked.  
     def show_product_details(self, row, column):
         try:
@@ -942,7 +1212,9 @@ class ProductManager(QMainWindow):
             
         except Exception as e:
             self.show_message("Error", f"Error loading product details: {str(e)}", QMessageBox.Critical)
-    
+
+
+
     # Shows barcode popup when barcode cell is double-clicked.
     def show_barcode_popup(self, row, column):
         if column == 6:  # Barcode column index changed to 6
@@ -951,6 +1223,8 @@ class ProductManager(QMainWindow):
                 barcode_path = barcode_item.text()
                 self.popup = BarcodePopup(barcode_path, self)
                 self.popup.show()
+
+  
 
     # Exports table data to Excel with barcode images.    
     def export_to_excel(self):
@@ -1097,7 +1371,7 @@ class ProductManager(QMainWindow):
         
         except Exception as e:
             self.show_message("Error", f"Export failed: {str(e)}", QMessageBox.Critical)
-   
+
     # Resets table to show all products.
     def show_all_products(self):
         """Show all rows and clear search"""
