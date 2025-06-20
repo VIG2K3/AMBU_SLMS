@@ -9,7 +9,7 @@ from barcode.writer import ImageWriter
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
                             QComboBox, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, 
                             QGroupBox, QFormLayout, QDialog, QSplitter, QMessageBox, QFileDialog,
-                            QDateEdit, QCalendarWidget, QStyle, QHeaderView, QSizePolicy)
+                            QDateEdit, QCalendarWidget, QStyle, QHeaderView, QSizePolicy, QTextEdit)
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt, QDate
 from datetime import datetime
@@ -21,7 +21,7 @@ from openpyxl.utils.units import pixels_to_EMU
 
 class DatabaseManager:
     # Initializes the database connection and creates tables.
-    def __init__(self, db_file="products.db"):
+    def __init__(self, db_file="ProductAdmin.db"):
         self.db_file = db_file
         self.create_connection()
         self.create_tables()
@@ -43,12 +43,12 @@ class DatabaseManager:
                                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                                         category TEXT NOT NULL,
                                         name TEXT NOT NULL,
+                                        description TEXT,
                                         quantity INTEGER NOT NULL,
-                                        expiry_date TEXT,
-                                        email TEXT,
+                                        supplier_email TEXT NOT NULL,
                                         barcode TEXT UNIQUE,
-                                        created_date TEXT DEFAULT CURRENT_TIMESTAMP,
-                                        status TEXT NOT NULL
+                                        test_date TEXT,
+                                        created_date TEXT DEFAULT CURRENT_TIMESTAMP
                                     );"""
         
         try:
@@ -58,31 +58,27 @@ class DatabaseManager:
         except Error as e:
             print(e)
 
+    def _process_emails(self, email_string):
+        """Helper method to clean and normalize email strings"""
+        if not email_string:
+            return None
+        
+        # Split, strip, and filter empty strings
+        emails = [e.strip() for e in email_string.split(',') if e.strip()]
+        
+        # Return as comma-separated string if emails exist
+        return ', '.join(emails) if emails else None
+
     # Inserts a new product into the database.
     def add_product(self, product):
         """Add a new product to the products table"""
-        sql = '''INSERT INTO products(category, name, quantity, expiry_date, email, barcode, status)
+        sql = '''INSERT INTO products(category, name, description, quantity, supplier_email, barcode, test_date)
                  VALUES(?,?,?,?,?,?,?)'''
         try:
             c = self.conn.cursor()
             c.execute(sql, product)
             self.conn.commit()
             return c.lastrowid
-        except Error as e:
-            print(e)
-            return None
-        
-    # Updates an existing product in the database.
-    def update_product(self, product):
-        """Update an existing product"""
-        sql = '''UPDATE products
-                 SET category = ?, name = ?, quantity = ?, expiry_date = ?, email = ?, status = ?
-                 WHERE id = ?'''
-        try:
-            c = self.conn.cursor()
-            c.execute(sql, product)
-            self.conn.commit()
-            return c.rowcount
         except Error as e:
             print(e)
             return None
@@ -123,6 +119,8 @@ class DatabaseManager:
                 c.execute("SELECT * FROM products WHERE name LIKE ?", (f'%{search_term}%',))
             elif search_type == "Category":
                 c.execute("SELECT * FROM products WHERE category LIKE ?", (f'%{search_term}%',))
+            elif search_type == "Description":
+                c.execute("SELECT * FROM products WHERE description LIKE ?", (f'%{search_term}%',))
             else:
                 return []
                 
@@ -131,7 +129,6 @@ class DatabaseManager:
             print(e)
             return []
 
-# Purpose: Provides a calendar widget for single date selection.
 class DatePickerDialog(QDialog):
     
     # Initializes the dialog with calendar widget.
@@ -149,9 +146,11 @@ class DatePickerDialog(QDialog):
         # Create calendar widget
         self.calendar = QCalendarWidget()
         self.calendar.setGridVisible(True)
-        self.calendar.setMinimumDate(QDate(1900, 1, 1))
+        self.calendar.setMinimumDate(QDate.currentDate())
         self.calendar.setMaximumDate(QDate(2100, 12, 31))
         self.calendar.setSelectedDate(QDate.currentDate())
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+
         
         # Buttons
         button_layout = QHBoxLayout()
@@ -170,7 +169,6 @@ class DatePickerDialog(QDialog):
     def get_selected_date(self):
         return self.calendar.selectedDate()
 
-# Provides a dialog for selecting a date range (from/to dates).
 class DateRangePickerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -194,6 +192,7 @@ class DateRangePickerDialog(QDialog):
         self.from_calendar.setMinimumDate(QDate(1900, 1, 1))
         self.from_calendar.setMaximumDate(QDate(2100, 12, 31))
         self.from_calendar.setSelectedDate(QDate.currentDate())
+        self.from_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  # This removes the week numbers
         from_layout.addWidget(self.from_calendar)
         from_group.setLayout(from_layout)
         
@@ -205,6 +204,7 @@ class DateRangePickerDialog(QDialog):
         self.to_calendar.setMinimumDate(QDate(1900, 1, 1))
         self.to_calendar.setMaximumDate(QDate(2100, 12, 31))
         self.to_calendar.setSelectedDate(QDate.currentDate())
+        self.to_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  # This removes the week numbers
         to_layout.addWidget(self.to_calendar)
         to_group.setLayout(to_layout)
         calendar_layout.addWidget(from_group)
@@ -227,7 +227,6 @@ class DateRangePickerDialog(QDialog):
     def get_selected_dates(self):
         return (self.from_calendar.selectedDate(), self.to_calendar.selectedDate())
 
-# Generates and manages barcode images for products.
 class BarcodeGenerator:
     # Initializes barcode generator and creates directory for barcode images.
     def __init__(self):
@@ -235,7 +234,7 @@ class BarcodeGenerator:
         self.generated_barcodes = []
         self.used_numbers = set()
         # Create BarcodeImages directory if it doesn't exist
-        self.barcode_dir = "BarcodeImages"
+        self.barcode_dir = "AdminBarcodeImages"
         os.makedirs(self.barcode_dir, exist_ok=True)
 
     # Generates a unique 12-digit number for barcodes.
@@ -267,7 +266,6 @@ class BarcodeGenerator:
         
         return barcode_number, full_path
 
-# Displays a popup dialog showing a barcode image.   
 class BarcodePopup(QDialog):
 
     # Initializes the popup with barcode image.
@@ -299,7 +297,6 @@ class BarcodePopup(QDialog):
         close_btn.clicked.connect(self.close)
         layout.addWidget(close_btn)
 
-#Main application window that provides the GUI for product management.
 class ProductManager(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -350,12 +347,12 @@ class ProductManager(QMainWindow):
         products = self.db.get_all_products()
         
         for product in products:
-            pid, category, name, qty, expiry, email, barcode, created, status = product
-            self.add_table_row(pid, category, name, qty, expiry, email, barcode, status, created)
+            pid, category, name, description, qty, supplier_email, barcode, test_date, created = product
+            self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, created)
      
     # Creates the search section of the UI.
     def create_search_group(self):
-        self.search_group = QGroupBox("Search Products")
+        self.search_group = QGroupBox("SEARCH PRODUCTS")
         self.search_group.setStyleSheet("""
             QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
@@ -371,7 +368,7 @@ class ProductManager(QMainWindow):
         search_layout.addStretch()
 
         self.search_combo = QComboBox()
-        self.search_combo.addItems(["Select", "ID", "Name", "Category"])
+        self.search_combo.addItems(["Select", "ID", "Name", "Category", "Description"])
         self.search_combo.setStyleSheet("""
             QComboBox {padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 100px;}""")
         search_layout.addWidget(self.search_combo)
@@ -422,7 +419,7 @@ class ProductManager(QMainWindow):
         self.search_button.clicked.connect(self.search_products)
         self.show_all_button.clicked.connect(self.show_all_products)
 
-     # Shows date picker for expiry date selection.
+     # Shows date picker for test date selection.
     def show_date_picker(self):
         dialog = DatePickerDialog(self)
         if dialog.exec_() == QDialog.Accepted:
@@ -448,7 +445,7 @@ class ProductManager(QMainWindow):
         to_date = datetime.strptime(to_date, "%d-%m-%Y")
         
         for row in range(self.table.rowCount()):
-            created_item = self.table.item(row, 7)  # Created Date column
+            created_item = self.table.item(row, 8)  # Created Date column (now index 8)
             if created_item:
                 try:
                     created_date = datetime.strptime(created_item.text(), "%d-%m-%Y")
@@ -459,19 +456,41 @@ class ProductManager(QMainWindow):
                     self.table.setRowHidden(row, True)
     
     # Validates date format (DD-MM-YYYY).
+    # Validates date format (DD-MM-YYYY).
     def validate_date(self, date_str):
+        if not date_str.strip():
+            self.show_message("Error", "Test date cannot be blank", QMessageBox.Warning)
+            return False
+    
+        if any(c.isalpha() for c in date_str):
+            self.show_message("Error", "Test date cannot contain letters", QMessageBox.Warning)
+            return False
+    
+        if not re.fullmatch(r'\d{2}-\d{2}-\d{4}', date_str):
+            self.show_message("Error", "Date must be in DD-MM-YYYY format (e.g. 31-12-2023)", QMessageBox.Warning)
+            return False
+    
         try:
-            datetime.strptime(date_str, "%d-%m-%Y")
+            day, month, year = map(int, date_str.split('-'))
+            datetime.strptime(date_str, "%d-%m-%Y")  # Will raise ValueError for invalid dates
             return True
+        
         except ValueError:
+            self.show_message("Error", "Please enter a valid calendar date", QMessageBox.Warning)
             return False
     
     # Validates email format.
     def validate_email(self, email):
-        if not email:
-            return True
+        """Validate one or more comma-separated emails"""
+        if not email.strip():
+            return False
         
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        emails = [e.strip() for e in email.split(',') if e.strip()]
+        
+        for email in emails:
+            pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+            if not re.match(pattern, email):
+                return False
         
         if not re.match(pattern, email):
             return False
@@ -493,6 +512,7 @@ class ProductManager(QMainWindow):
         tld = domain_part.split('.')[-1]
         if len(tld) < 2:
             return False
+        
         return True
 
     # Shows a message box.  
@@ -505,7 +525,7 @@ class ProductManager(QMainWindow):
 
     # Creates the product details form.   
     def create_product_form(self):
-        self.product_details_group = QGroupBox("Product Details")
+        self.product_details_group = QGroupBox("PRODUCT DETAILS")
         self.product_details_group.setStyleSheet("""
             QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
@@ -535,7 +555,7 @@ class ProductManager(QMainWindow):
         label_font = QFont()
         label_font.setBold(True)  
 
-        category_label = QLabel("Product Category:")
+        category_label = QLabel("PRODUCT CATEGORY:")
         category_label.setFont(label_font)
         self.category_input = QLineEdit()
         self.category_input.setPlaceholderText("Enter product category")
@@ -543,7 +563,7 @@ class ProductManager(QMainWindow):
         self.category_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
 
-        name_label = QLabel("Product Name:")
+        name_label = QLabel("PRODUCT NAME:")
         name_label.setFont(label_font)
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("Enter product name")
@@ -551,7 +571,15 @@ class ProductManager(QMainWindow):
         self.name_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
 
-        quantity_label = QLabel("Quantity:")
+        description_label = QLabel("DESCRIPTION:")
+        description_label.setFont(label_font)
+        self.description_input = QTextEdit()
+        self.description_input.setPlaceholderText("Enter product description")
+        self.description_input.setMaximumHeight(100)
+        self.description_input.setStyleSheet("""
+            QTextEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
+
+        quantity_label = QLabel("QUANTITY:")
         quantity_label.setFont(label_font)
         self.quantity_input = QLineEdit()
         self.quantity_input.setPlaceholderText("Enter quantity")
@@ -559,11 +587,11 @@ class ProductManager(QMainWindow):
         self.quantity_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
 
-        expiry_label = QLabel("Expiry Date:")
+        expiry_label = QLabel("TEST DATE:")
         expiry_label.setFont(label_font)
         expiry_layout = QHBoxLayout()
         self.expiry_date_input = QLineEdit()
-        self.expiry_date_input.setPlaceholderText("DD-MM-YYYY")
+        self.expiry_date_input.setPlaceholderText("Test Date (DD-MM-YYYY)")
         self.expiry_date_input.setMinimumWidth(120)
         self.expiry_date_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
@@ -580,29 +608,21 @@ class ProductManager(QMainWindow):
         expiry_layout.addWidget(self.calendar_button)
         expiry_layout.setSpacing(5)
 
-        email_label = QLabel("Employee Email:")
-        email_label.setFont(label_font)
-        self.email_input = QLineEdit()
-        self.email_input.setPlaceholderText("user@example.com")
-        self.email_input.setMinimumWidth(250)
-        self.email_input.setStyleSheet("""
+        supplier_email_label = QLabel("EMAIL:")
+        supplier_email_label.setFont(label_font)
+        self.supplier_email_input = QLineEdit()
+        self.supplier_email_input.setPlaceholderText("email1@example.com, email2@domain.com")
+        self.supplier_email_input.setMinimumWidth(250)
+        self.supplier_email_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
-
-        status_label = QLabel("Status:")
-        status_label.setFont(label_font)
-        self.status_combo = QComboBox()
-        self.status_combo.addItems(["Active", "Inactive"])
-        self.status_combo.setMinimumWidth(120)
-        self.status_combo.setStyleSheet("""
-            QComboBox {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
 
         left_column.addRow(category_label, self.category_input)
         left_column.addRow(name_label, self.name_input)
-        left_column.addRow(quantity_label, self.quantity_input)
+        left_column.addRow(description_label, self.description_input)
 
+        right_column.addRow(quantity_label, self.quantity_input)
         right_column.addRow(expiry_label, expiry_layout)
-        right_column.addRow(email_label, self.email_input)
-        right_column.addRow(status_label, self.status_combo)
+        right_column.addRow(supplier_email_label, self.supplier_email_input)
 
         form_layout.addLayout(left_column)
         form_layout.addLayout(right_column)
@@ -615,9 +635,9 @@ class ProductManager(QMainWindow):
         self.table = QTableWidget()
         self.table.setColumnCount(9)
         self.table.setHorizontalHeaderLabels([
-            "PRODUCT ID", "PRODUCT CATEGORY", "PRODUCT NAME", 
-            "QUANTITY", "EXPIRY DATE", "EMPLOYEE EMAIL", 
-            "BARCODE", "CREATED DATE", "STATUS"
+            "PRODUCT ID", "PRODUCT CATEGORY", "PRODUCT NAME", "DESCRIPTION",
+            "QUANTITY", "EMAIL", "BARCODE", 
+            "TEST DATE", "CREATED DATE"
         ])
         
         self.table.setStyleSheet("""
@@ -635,21 +655,24 @@ class ProductManager(QMainWindow):
         
         header = self.table.horizontalHeader()
         header.setDefaultAlignment(Qt.AlignCenter)
-        header.setStretchLastSection(False)
+        header.setStretchLastSection(True)
         
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.Interactive)
-        header.setSectionResizeMode(2, QHeaderView.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(5, QHeaderView.Interactive)
-        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)
-        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # ID
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)  # Category
+        header.setSectionResizeMode(2, QHeaderView.Interactive)       # Name
+        header.setSectionResizeMode(3, QHeaderView.Interactive)       # Description
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Quantity
+        header.setSectionResizeMode(5, QHeaderView.Interactive)       # Supplier Email
+        header.setSectionResizeMode(6, QHeaderView.ResizeToContents)  # Barcode
+        header.setSectionResizeMode(7, QHeaderView.ResizeToContents)  # Test Date
+        header.setSectionResizeMode(8, QHeaderView.ResizeToContents)  # Created
 
-        self.table.setColumnWidth(1, 200)
-        self.table.setColumnWidth(2, 300)
-        self.table.setColumnWidth(5, 250)
+        self.table.setColumnWidth(1, 150)  # Category
+        self.table.setColumnWidth(2, 200)  # Name
+        self.table.setColumnWidth(3, 250)  # Description
+        self.table.setColumnWidth(5, 200)  # Supplier Email
+
+        self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         self.table.setTextElideMode(Qt.ElideRight)
         self.table.cellClicked.connect(self.show_product_details)
@@ -662,7 +685,7 @@ class ProductManager(QMainWindow):
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.setSpacing(15)
         
-        button_style = """QPushButton {background-color: #b60338; color: #d9d9d9; border: 1px solid #ccc; border-radius: 4px; padding: 8px 50px; min-width: 100px; font-weight: bold;}
+        button_style = """QPushButton {background-color: #b60338; color: #d9d9d9; border: 1px solid #ccc; border-radius: 4px; padding: 8px 85px; min-width: 100px; font-weight: bold;}
                          QPushButton:hover {background-color: #f31659;}
                          QPushButton:pressed {background-color: #ff4757;}"""
 
@@ -672,11 +695,10 @@ class ProductManager(QMainWindow):
         first_row_layout.addStretch()
     
         self.save_button = QPushButton("Save")
-        self.update_button = QPushButton("Update")
         self.delete_button = QPushButton("Delete")
         self.clear_button = QPushButton("Clear")
     
-        for btn in [self.save_button, self.update_button, self.delete_button, self.clear_button]:
+        for btn in [self.save_button, self.delete_button, self.clear_button]:
             btn.setStyleSheet(button_style)
             btn.setFixedHeight(35)
             btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
@@ -705,10 +727,230 @@ class ProductManager(QMainWindow):
         container_layout.addWidget(second_row_container)
     
         self.save_button.clicked.connect(self.save_product)
-        self.update_button.clicked.connect(self.update_product)
         self.delete_button.clicked.connect(self.delete_product)
         self.clear_button.clicked.connect(self.clear_fields)
         self.export_excel_button.clicked.connect(self.export_to_excel)
+
+        # Adds a row to the table.
+    def add_table_row(self, pid, category, name, description, qty, supplier_email="", barcode="", test_date="", created_date=None):
+        row_position = self.table.rowCount()
+        self.table.insertRow(row_position)
+        
+        # Format created_date if not provided
+        if created_date is None:
+            created_date = datetime.now().strftime("%d-%m-%Y")
+        elif isinstance(created_date, str):
+            try:
+                # Handle both database format and display format
+                if "-" in created_date and len(created_date.split("-")[0]) == 4:  # Database format (YYYY-MM-DD)
+                    created_date = datetime.strptime(created_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
+            except:
+                pass  # Keep original format if conversion fails
+        
+        def create_centered_item(text):
+            item = QTableWidgetItem(str(text))
+            item.setTextAlignment(Qt.AlignCenter)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            return item
+        
+        def create_left_item(text):
+            item = QTableWidgetItem(str(text))
+            item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            return item
+        
+        self.table.setItem(row_position, 0, create_centered_item(pid))
+        self.table.setItem(row_position, 1, create_left_item(category))
+        self.table.setItem(row_position, 2, create_left_item(name))
+        self.table.setItem(row_position, 3, create_left_item(description))
+        self.table.setItem(row_position, 4, create_centered_item(qty))
+        self.table.setItem(row_position, 5, create_left_item(supplier_email))
+        self.table.setItem(row_position, 6, create_left_item(barcode))
+        self.table.setItem(row_position, 7, create_centered_item(test_date))
+        self.table.setItem(row_position, 8, create_centered_item(created_date))
+
+        # Saves a new product to database.
+    def save_product(self):
+        try:
+            category = self.category_input.text().strip()
+            name = self.name_input.text().strip()
+            description = self.description_input.toPlainText().strip()
+            qty = self.quantity_input.text().strip()
+            test_date = self.expiry_date_input.text().strip()
+            supplier_email = self.supplier_email_input.text().strip()
+            
+            if not category:
+                self.show_message("Error", "Please enter a category", QMessageBox.Warning)
+                return
+                
+            if not name:
+                self.show_message("Error", "Product name cannot be empty", QMessageBox.Warning)
+                return
+                
+            if not qty or not qty.isdigit():
+                self.show_message("Error", "Please enter a valid quantity", QMessageBox.Warning)
+                return
+            
+            if not self.validate_date(test_date):
+                return  # validate_date will show appropriate error message
+            
+            if not supplier_email:
+                self.show_message("Error", "Supplier email is required", QMessageBox.Warning)
+                return
+            
+            if supplier_email and not self.validate_email(supplier_email):
+                self.show_message("Error", 
+                            "Please enter valid email address(es)\n"
+                            "Multiple emails should be comma-separated\n"
+                            "Example: supplier1@example.com, supplier2@domain.com", 
+                    QMessageBox.Warning)
+                return
+            
+            for row in range(self.table.rowCount()):
+                existing_name = self.table.item(row, 2).text()
+                if existing_name.lower() == name.lower():
+                    reply = QMessageBox.question(self, "Confirm", 
+                                               f"A product with name '{name}' already exists.\nDo you want to create a new entry with a different barcode?",
+                                               QMessageBox.Yes | QMessageBox.No)
+                    if reply == QMessageBox.No:
+                        return
+                    break
+            
+            barcode_number, filename = self.barcode_gen.generate_barcode(name)
+            
+            product = (category, name, description, int(qty), supplier_email, filename, test_date if test_date else None)
+            product_id = self.db.add_product(product)
+            
+            if product_id:
+                self.add_table_row(product_id, category, name, description, qty, supplier_email, filename, test_date)
+                self.clear_fields()
+                self.show_message("Success", "Product saved successfully!")
+            else:
+                self.show_message("Error", "Failed to save product to database", QMessageBox.Critical)
+            
+        except Exception as e:
+            self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
+
+    # Deletes selected products.
+    def delete_product(self):
+        selected_rows = {index.row() for index in self.table.selectedIndexes()}
+        
+        if not selected_rows:
+            self.show_message("Error", "No rows selected", QMessageBox.Warning)
+            return
+        
+        reply = QMessageBox.question(
+            self, "Confirm Delete", 
+            f"Delete {len(selected_rows)} selected product(s)?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if reply == QMessageBox.Yes:
+            for row in sorted(selected_rows, reverse=True):
+                product_id = int(self.table.item(row, 0).text())
+                barcode_item = self.table.item(row, 6)  # Barcode column index changed to 6
+                
+                deleted_rows = self.db.delete_product(product_id)
+                
+                if deleted_rows:
+                    if barcode_item and barcode_item.text():
+                        try:
+                            filepath = barcode_item.text()
+                            if os.path.exists(filepath):
+                                os.remove(filepath)
+                            # Remove the .pnm file if it exists
+                            pnm_path = filepath.replace('.png', '.pnm')
+                            if os.path.exists(pnm_path):
+                                os.remove(pnm_path)
+                        except Exception as e:
+                            self.show_message("Warning", 
+                                           f"Deleted product but couldn't delete image: {str(e)}",
+                                           QMessageBox.Warning)
+                    
+                    self.table.removeRow(row)
+                else:
+                    self.show_message("Error", f"Failed to delete product ID {product_id}", QMessageBox.Critical)
+    
+    # Clears the product form.
+    def clear_fields(self):
+        self.category_input.clear()
+        self.name_input.clear()
+        self.description_input.clear()
+        self.quantity_input.clear()
+        self.expiry_date_input.clear()
+        self.supplier_email_input.clear()
+    
+    # Searches products based on criteria.
+    def search_products(self):
+        search_type = self.search_combo.currentText()
+        
+        if search_type == "Select":
+            self.show_message("Error", "Please select search type", QMessageBox.Warning)
+            return
+            
+        search_term = self.search_input.text().strip()
+        
+        if not search_term:
+            self.show_message("Error", "Please enter search term", QMessageBox.Warning)
+            return
+        
+        products = self.db.search_products(search_type, search_term)
+        
+        # Clear current filters
+        for row in range(self.table.rowCount()):
+            self.table.setRowHidden(row, False)
+        
+        # If searching by something other than date, filter the table
+        if search_type != "Date Range":
+            for row in range(self.table.rowCount()):
+                match = False
+                if search_type == "ID":
+                    item = self.table.item(row, 0)
+                    if item and search_term == item.text():
+                        match = True
+                elif search_type == "Name":
+                    item = self.table.item(row, 2)
+                    if item and search_term.lower() in item.text().lower():
+                        match = True
+                elif search_type == "Category":
+                    item = self.table.item(row, 1)
+                    if item and search_term.lower() in item.text().lower():
+                        match = True
+                elif search_type == "Description":
+                    item = self.table.item(row, 3)
+                    if item and search_term.lower() in item.text().lower():
+                        match = True
+                
+                self.table.setRowHidden(row, not match)
+
+    # Shows product details when row is clicked.  
+    def show_product_details(self, row, column):
+        try:
+            category = self.table.item(row, 1).text()
+            name = self.table.item(row, 2).text()
+            description = self.table.item(row, 3).text()
+            qty = self.table.item(row, 4).text()
+            supplier_email = self.table.item(row, 5).text()
+            test_date = self.table.item(row, 7).text()  # Test Date column index changed to 7
+            
+            self.category_input.setText(category)
+            self.name_input.setText(name)
+            self.description_input.setPlainText(description)
+            self.quantity_input.setText(qty)
+            self.expiry_date_input.setText(test_date)
+            self.supplier_email_input.setText(supplier_email)
+            
+        except Exception as e:
+            self.show_message("Error", f"Error loading product details: {str(e)}", QMessageBox.Critical)
+    
+    # Shows barcode popup when barcode cell is double-clicked.
+    def show_barcode_popup(self, row, column):
+        if column == 6:  # Barcode column index changed to 6
+            barcode_item = self.table.item(row, column)
+            if barcode_item and barcode_item.text():
+                barcode_path = barcode_item.text()
+                self.popup = BarcodePopup(barcode_path, self)
+                self.popup.show()
 
     # Exports table data to Excel with barcode images.    
     def export_to_excel(self):
@@ -752,25 +994,43 @@ class ProductManager(QMainWindow):
                 worksheet.column_dimensions['A'].width = 12  # ID
                 worksheet.column_dimensions['B'].width = 20  # Category
                 worksheet.column_dimensions['C'].width = 30  # Name
-                worksheet.column_dimensions['D'].width = 10  # Quantity
-                worksheet.column_dimensions['E'].width = 12  # Expiry
-                worksheet.column_dimensions['F'].width = 25  # Email
+                worksheet.column_dimensions['D'].width = 40  # Description
+                worksheet.column_dimensions['E'].width = 10  # Quantity
+                worksheet.column_dimensions['F'].width = 25  # Supplier Email
                 worksheet.column_dimensions['G'].width = 30  # Barcode (wider for image)
-                worksheet.column_dimensions['H'].width = 12  # Created
-                worksheet.column_dimensions['I'].width = 10  # Status
+                worksheet.column_dimensions['H'].width = 12  # Test Date
+                worksheet.column_dimensions['I'].width = 12  # Created
 
                 # Set row heights for rows with images
+                from openpyxl.styles import Alignment
+                wrap_alignment = Alignment(wrap_text=True, vertical='top')
+
                 for row_idx in range(2, len(data)+2):  # Start from row 2 (skip header)
-                    worksheet.row_dimensions[row_idx].height = 60  # Adjust height for images
+                    worksheet.row_dimensions[row_idx].height = 60  # Default height
+
+                    # Apply wrap text to description (column D) and email (column F)
+                    worksheet[f'D{row_idx}'].alignment = wrap_alignment
+                    worksheet[f'F{row_idx}'].alignment = wrap_alignment
+
+                    # Auto-adjust row height based on content length
+                    desc_len = len(str(worksheet[f'D{row_idx}'].value))
+                    email_len = len(str(worksheet[f'F{row_idx}'].value))
+
+                    # Increase row height if content is long
+                    if desc_len > 100 or email_len > 50:
+                        worksheet.row_dimensions[row_idx].height = 80
+                    if desc_len > 200 or email_len > 100:
+                        worksheet.row_dimensions[row_idx].height = 100
 
                 # Create center alignment style for all cells
-                from openpyxl.styles import Alignment
                 center_alignment = Alignment(horizontal='center', vertical='center')
             
                 # Apply center alignment to all cells
                 for row in worksheet.iter_rows(min_row=2, max_row=len(data)+1):
                     for cell in row:
-                        cell.alignment = center_alignment
+                        # Center align most columns
+                        if cell.column_letter not in ['D', 'F']:
+                            cell.alignment = center_alignment
             
                 # Add images to cells with centered alignment
                 for row_idx, row_data in enumerate(data, start=2):  # Skip header
@@ -793,7 +1053,7 @@ class ProductManager(QMainWindow):
                         
                             # Calculate center position
                             col_width = worksheet.column_dimensions['G'].width
-                            row_height = worksheet.row_dimensions[row_idx].height
+                            row_height = worksheet.row_dimensions[row_idx].height or 15
                         
                             # Convert dimensions to EMU (Excel Measurement Units)
                             cell_width_emu = pixels_to_EMU(col_width * 7)  # Approximate conversion
@@ -845,289 +1105,6 @@ class ProductManager(QMainWindow):
             self.table.setRowHidden(row, False)
         self.search_input.clear()
         self.search_combo.setCurrentIndex(0)
-
-    # Adds a row to the table.
-    def add_table_row(self, pid, category, name, qty, expiry="", email="", barcode="", status="", created_date=None):
-        row_position = self.table.rowCount()
-        self.table.insertRow(row_position)
-        
-        # Format created_date if not provided
-        if created_date is None:
-            created_date = datetime.now().strftime("%d-%m-%Y")
-        elif isinstance(created_date, str):
-            try:
-                # Handle both database format and display format
-                if "-" in created_date and len(created_date.split("-")[0]) == 4:  # Database format (YYYY-MM-DD)
-                    created_date = datetime.strptime(created_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
-            except:
-                pass  # Keep original format if conversion fails
-        
-        def create_centered_item(text):
-            item = QTableWidgetItem(str(text))
-            item.setTextAlignment(Qt.AlignCenter)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            return item
-        
-        def create_left_item(text):
-            item = QTableWidgetItem(str(text))
-            item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            return item
-        
-        self.table.setItem(row_position, 0, create_centered_item(pid))
-        self.table.setItem(row_position, 1, create_left_item(category))
-        self.table.setItem(row_position, 2, create_left_item(name))
-        self.table.setItem(row_position, 3, create_centered_item(qty))
-        self.table.setItem(row_position, 4, create_centered_item(expiry))
-        self.table.setItem(row_position, 5, create_left_item(email))
-        self.table.setItem(row_position, 6, create_left_item(barcode))
-        self.table.setItem(row_position, 7, create_centered_item(created_date))
-        self.table.setItem(row_position, 8, create_centered_item(status))
-
-    # Saves a new product to database.
-    def save_product(self):
-        try:
-            category = self.category_input.text().strip()
-            name = self.name_input.text().strip()
-            qty = self.quantity_input.text().strip()
-            expiry = self.expiry_date_input.text().strip()
-            email = self.email_input.text().strip()
-            status = self.status_combo.currentText()
-            
-            if not category:
-                self.show_message("Error", "Please enter a category", QMessageBox.Warning)
-                return
-                
-            if not name:
-                self.show_message("Error", "Product name cannot be empty", QMessageBox.Warning)
-                return
-                
-            if not qty or not qty.isdigit():
-                self.show_message("Error", "Please enter a valid quantity", QMessageBox.Warning)
-                return
-            
-            if expiry and not self.validate_date(expiry):
-                self.show_message("Error", "Please enter date in DD-MM-YYYY format (e.g. 30-05-2025)", QMessageBox.Warning)
-                return
-            
-            if email and not self.validate_email(email):
-                self.show_message("Error", 
-                    "Please enter a valid email address\n"
-                    "Example: john.doe@example.com", 
-                    QMessageBox.Warning)
-                return
-            
-            for row in range(self.table.rowCount()):
-                existing_name = self.table.item(row, 2).text()
-                if existing_name.lower() == name.lower():
-                    reply = QMessageBox.question(self, "Confirm", 
-                                               f"A product with name '{name}' already exists.\nDo you want to create a new entry with a different barcode?",
-                                               QMessageBox.Yes | QMessageBox.No)
-                    if reply == QMessageBox.No:
-                        return
-                    break
-            
-            barcode_number, filename = self.barcode_gen.generate_barcode(name)
-            
-            product = (category, name, int(qty), expiry if expiry else None, 
-                      email if email else None, filename, status)
-            product_id = self.db.add_product(product)
-            
-            if product_id:
-                self.add_table_row(product_id, category, name, qty, expiry, email, filename, status)
-                self.clear_fields()
-                self.show_message("Success", "Product saved successfully!")
-            else:
-                self.show_message("Error", "Failed to save product to database", QMessageBox.Critical)
-            
-        except Exception as e:
-            self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
-
-    # Updates an existing product.
-    def update_product(self):
-        try:
-            selected = self.table.selectedItems()
-            if not selected:
-                self.show_message("Error", "Please select a row to update", QMessageBox.Warning)
-                return
-            
-            reply = QMessageBox.question(self, "Confirm Update","Are you sure you want to update this product?", QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            
-            if reply != QMessageBox.Yes:
-                return
-            
-            row = selected[0].row()
-            product_id = int(self.table.item(row, 0).text())
-            category = self.category_input.text().strip()
-            name = self.name_input.text().strip()
-            qty = self.quantity_input.text().strip()
-            expiry = self.expiry_date_input.text().strip()
-            email = self.email_input.text().strip()
-            status = self.status_combo.currentText()
-            
-            if not category:
-                self.show_message("Error", "Please enter a category", QMessageBox.Warning)
-                return
-                
-            if not name:
-                self.show_message("Error", "Product name cannot be empty", QMessageBox.Warning)
-                return
-                
-            if not qty or not qty.isdigit():
-                self.show_message("Error", "Please enter a valid quantity", QMessageBox.Warning)
-                return
-            
-            if expiry and not self.validate_date(expiry):
-                self.show_message("Error", "Please enter date in DD-MM-YYYY format (e.g. 30-05-2025)", QMessageBox.Warning)
-                return
-            
-            if email and not self.validate_email(email):
-                self.show_message("Error", 
-                    "Please enter a valid email address\n"
-                    "Example: john.doe@example.com", 
-                    QMessageBox.Warning)
-                return
-            
-            product = (category, name, int(qty), expiry if expiry else None, 
-                       email if email else None, status, product_id)
-            updated_rows = self.db.update_product(product)
-            
-            if updated_rows:
-                self.table.item(row, 1).setText(category)
-                self.table.item(row, 2).setText(name)
-                self.table.item(row, 3).setText(qty)
-                self.table.item(row, 4).setText(expiry)
-                self.table.item(row, 5).setText(email)
-                self.table.item(row, 8).setText(status)
-                
-                self.clear_fields()
-                self.show_message("Success", "Product updated successfully!")
-            else:
-                self.show_message("Error", "Failed to update product in database", QMessageBox.Critical)
-                
-        except Exception as e:
-            self.show_message("Error", f"An error occurred: {str(e)}", QMessageBox.Critical)
-
-    # Deletes selected products.
-    def delete_product(self):
-        selected_rows = {index.row() for index in self.table.selectedIndexes()}
-        
-        if not selected_rows:
-            self.show_message("Error", "No rows selected", QMessageBox.Warning)
-            return
-        
-        reply = QMessageBox.question(
-            self, "Confirm Delete", 
-            f"Delete {len(selected_rows)} selected product(s)?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            for row in sorted(selected_rows, reverse=True):
-                product_id = int(self.table.item(row, 0).text())
-                barcode_item = self.table.item(row, 6)
-                
-                deleted_rows = self.db.delete_product(product_id)
-                
-                if deleted_rows:
-                    if barcode_item and barcode_item.text():
-                        try:
-                            filepath = barcode_item.text()
-                            if os.path.exists(filepath):
-                                os.remove(filepath)
-                            # Remove the .pnm file if it exists
-                            pnm_path = filepath.replace('.png', '.pnm')
-                            if os.path.exists(pnm_path):
-                                os.remove(pnm_path)
-                        except Exception as e:
-                            self.show_message("Warning", 
-                                           f"Deleted product but couldn't delete image: {str(e)}",
-                                           QMessageBox.Warning)
-                    
-                    self.table.removeRow(row)
-                else:
-                    self.show_message("Error", f"Failed to delete product ID {product_id}", QMessageBox.Critical)
-    
-    # Clears the product form.
-    def clear_fields(self):
-        self.category_input.clear()
-        self.name_input.clear()
-        self.quantity_input.clear()
-        self.expiry_date_input.clear()
-        self.email_input.clear()
-        self.status_combo.setCurrentIndex(0)
-    
-    # Searches products based on criteria.
-    def search_products(self):
-        search_type = self.search_combo.currentText()
-        
-        if search_type == "Select":
-            self.show_message("Error", "Please select search type", QMessageBox.Warning)
-            return
-            
-        search_term = self.search_input.text().strip()
-        
-        if not search_term:
-            self.show_message("Error", "Please enter search term", QMessageBox.Warning)
-            return
-        
-        products = self.db.search_products(search_type, search_term)
-        
-        # Clear current filters
-        for row in range(self.table.rowCount()):
-            self.table.setRowHidden(row, False)
-        
-        # If searching by something other than date, filter the table
-        if search_type != "Date Range":
-            for row in range(self.table.rowCount()):
-                match = False
-                if search_type == "ID":
-                    item = self.table.item(row, 0)
-                    if item and search_term == item.text():
-                        match = True
-                elif search_type == "Name":
-                    item = self.table.item(row, 2)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                elif search_type == "Category":
-                    item = self.table.item(row, 1)
-                    if item and search_term.lower() in item.text().lower():
-                        match = True
-                
-                self.table.setRowHidden(row, not match)
-
-    # Shows product details when row is clicked.  
-    def show_product_details(self, row, column):
-        try:
-            category = self.table.item(row, 1).text()
-            name = self.table.item(row, 2).text()
-            qty = self.table.item(row, 3).text()
-            expiry = self.table.item(row, 4).text()
-            email = self.table.item(row, 5).text()
-            status = self.table.item(row, 8).text()
-            
-            self.category_input.setText(category)
-            self.name_input.setText(name)
-            self.quantity_input.setText(qty)
-            self.expiry_date_input.setText(expiry)
-            self.email_input.setText(email)
-            
-            # Set status in combo box
-            index = self.status_combo.findText(status)
-            if index >= 0:
-                self.status_combo.setCurrentIndex(index)
-            
-        except Exception as e:
-            self.show_message("Error", f"Error loading product details: {str(e)}", QMessageBox.Critical)
-    
-    # Shows barcode popup when barcode cell is double-clicked.
-    def show_barcode_popup(self, row, column):
-        if column == 6:  # Barcode column
-            barcode_item = self.table.item(row, column)
-            if barcode_item and barcode_item.text():
-                barcode_path = barcode_item.text()
-                self.popup = BarcodePopup(barcode_path, self)
-                self.popup.show()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
