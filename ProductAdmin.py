@@ -795,12 +795,12 @@ class ProductManager(QMainWindow):
                 return  # validate_date will show appropriate error message
             
             if not supplier_email:
-                self.show_message("Error", "Supplier email is required", QMessageBox.Warning)
+                self.show_message("Error", "email is required", QMessageBox.Warning)
                 return
             
             if supplier_email and not self.validate_email(supplier_email):
                 self.show_message("Error", 
-                            "Please enter valid email address(es)\n"
+                            "Please enter valid email\n"
                             "Multiple emails should be comma-separated\n"
                             "Example: supplier1@example.com, supplier2@domain.com", 
                     QMessageBox.Warning)
