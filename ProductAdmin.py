@@ -50,7 +50,7 @@ class DatabaseManager:
                                     test_date TEXT,
                                     created_date TEXT DEFAULT CURRENT_TIMESTAMP,
                                     status TEXT NOT NULL DEFAULT 'Pending',
-                                    creator_type TEXT NOT NULL  # Add this line
+                                    creator_type TEXT NOT NULL
                                 );"""
         
         try:
