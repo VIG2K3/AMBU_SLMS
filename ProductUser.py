@@ -63,7 +63,7 @@ class DatabaseManager:
         # Split, strip, and filter empty strings
         emails = [e.strip() for e in email_string.split(',') if e.strip()]
         
-        # Return as comma-separated string if emails exist
+        #comma-separated string if emails exist
         return ', '.join(emails) if emails else None
 
     # Inserts a new product into the database.
@@ -218,7 +218,7 @@ class DateRangePickerDialog(QDialog):
         self.from_calendar.setMinimumDate(QDate(1900, 1, 1))
         self.from_calendar.setMaximumDate(QDate(2100, 12, 31))
         self.from_calendar.setSelectedDate(QDate.currentDate())
-        self.from_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  # This removes the week numbers
+        self.from_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  #removes the week numbers
         from_layout.addWidget(self.from_calendar)
         from_group.setLayout(from_layout)
         
@@ -230,7 +230,7 @@ class DateRangePickerDialog(QDialog):
         self.to_calendar.setMinimumDate(QDate(1900, 1, 1))
         self.to_calendar.setMaximumDate(QDate(2100, 12, 31))
         self.to_calendar.setSelectedDate(QDate.currentDate())
-        self.to_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  # This removes the week numbers
+        self.to_calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)  #removes the week numbers
         to_layout.addWidget(self.to_calendar)
         to_group.setLayout(to_layout)
         calendar_layout.addWidget(from_group)
@@ -280,7 +280,7 @@ class BarcodeGenerator:
         barcode_number = self.generate_unique_number()
         generated = barcode_format(barcode_number, writer=ImageWriter())
         
-        # Create sanitized filename and full path
+        # Create filename and full path
         safe_name = "".join(c if c.isalnum() else "_" for c in product_name)
         filename = f"{safe_name}_{barcode_number}.png"
         full_path = os.path.join(self.barcode_dir, filename)
@@ -307,7 +307,7 @@ class BarcodePopup(QDialog):
         
         if barcode_path:
             try:
-                # Ensure we're looking in the correct path
+                # confirm we're looking in the correct path
                 if not os.path.exists(barcode_path):
                     barcode_path = os.path.join("BarcodeImages", os.path.basename(barcode_path))
                 
@@ -335,7 +335,7 @@ class ProductManager(QMainWindow):
         self.main_layout = QVBoxLayout()
         self.central_widget.setLayout(self.main_layout)
         
-        # Create search group (top section)
+        # Create search group at top section
         self.create_search_group()
         self.main_layout.addWidget(self.search_group)
         
@@ -472,15 +472,14 @@ class ProductManager(QMainWindow):
         to_date = datetime.strptime(to_date, "%d-%m-%Y")
         
         for row in range(self.table.rowCount()):
-            created_item = self.table.item(row, 8)  # Created Date column (now index 8)
+            created_item = self.table.item(row, 8)  # Created Date column
             if created_item:
                 try:
                     created_date = datetime.strptime(created_item.text(), "%d-%m-%Y")
                     show_row = from_date <= created_date <= to_date
                     self.table.setRowHidden(row, not show_row)
                 except ValueError:
-                    # If date format is invalid, hide the row
-                    self.table.setRowHidden(row, True)
+                    self.table.setRowHidden(row, True) # If date format is invalid, hide the row
     
     # Validates date format (DD-MM-YYYY).
     def validate_date(self, date_str):
@@ -637,7 +636,7 @@ class ProductManager(QMainWindow):
         supplier_email_label = QLabel("EMAIL:")
         supplier_email_label.setFont(label_font)
         self.supplier_email_input = QLineEdit()
-        self.supplier_email_input.setPlaceholderText("email1@example.com, email2@domain.com")
+        self.supplier_email_input.setPlaceholderText("email1@gmail.com, email2@gmail.com")
         self.supplier_email_input.setMinimumWidth(250)
         self.supplier_email_input.setStyleSheet("""
             QLineEdit {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}""")
@@ -656,7 +655,7 @@ class ProductManager(QMainWindow):
         main_layout.addWidget(form_container)
         self.product_details_group.setLayout(main_layout)
     
-    # Creates products table.
+    # Create products table.
     def create_table(self):
         self.table = QTableWidget()
         self.table.setColumnCount(10)
@@ -708,7 +707,7 @@ class ProductManager(QMainWindow):
         self.table.cellClicked.connect(self.show_product_details)
         self.table.cellDoubleClicked.connect(self.show_barcode_popup)
 
-    # Creates action buttons (Save, Update, Delete, etc.).            
+    # Creates action buttons (Save, Update, Delete).            
     def create_buttons(self):
         self.buttons_container = QWidget()
         container_layout = QVBoxLayout(self.buttons_container)
@@ -756,7 +755,7 @@ class ProductManager(QMainWindow):
                 if "-" in created_date and len(created_date.split("-")[0]) == 4:  # Database format (YYYY-MM-DD)
                     created_date = datetime.strptime(created_date, "%Y-%m-%d %H:%M:%S").strftime("%d-%m-%Y")
             except:
-                pass  # Keep original format if conversion fails
+                pass 
         
         def create_centered_item(text):
             item = QTableWidgetItem(str(text))
@@ -798,7 +797,7 @@ class ProductManager(QMainWindow):
 
         
 
-        # Saves a new product to database.
+    # Saves a new product to database.
     def save_product(self):
         try:
             category = self.category_input.text().strip()
@@ -854,7 +853,7 @@ class ProductManager(QMainWindow):
             if product_id:
                 self.add_table_row(product_id, category, name, description, qty, supplier_email, filename, test_date, status)
                 self.clear_fields()
-                self.show_message("Success", "Product saved successfully!")
+                self.show_message("Success", "Product is sent for approval successfully!")
             else:
                 self.show_message("Error", "Failed to save product to database", QMessageBox.Critical)
             
@@ -887,7 +886,7 @@ class ProductManager(QMainWindow):
         if reply == QMessageBox.Yes:
             for row in sorted(selected_rows, reverse=True):
                 product_id = int(self.table.item(row, 0).text())
-                barcode_item = self.table.item(row, 6)  # Barcode column index changed to 6
+                barcode_item = self.table.item(row, 6)
                 
                 deleted_rows = self.db.delete_product(product_id)
                 
@@ -978,7 +977,7 @@ class ProductManager(QMainWindow):
             description = self.table.item(row, 3).text()
             qty = self.table.item(row, 4).text()
             supplier_email = self.table.item(row, 5).text()
-            test_date = self.table.item(row, 7).text()  # Test Date column index changed to 7
+            test_date = self.table.item(row, 7).text() 
             
             self.category_input.setText(category)
             self.name_input.setText(name)
@@ -992,7 +991,7 @@ class ProductManager(QMainWindow):
     
     # Shows barcode popup when barcode cell is double-clicked.
     def show_barcode_popup(self, row, column):
-        if column == 6:  # Barcode column index changed to 6
+        if column == 6: 
             barcode_item = self.table.item(row, column)
             if barcode_item and barcode_item.text():
                 barcode_path = barcode_item.text()
