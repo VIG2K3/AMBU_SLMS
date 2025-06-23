@@ -1,7 +1,8 @@
-IF WANT TO RUN A PY FILE ALONE, MUST UN-HASH THE BELOW CODE...
+# If want to run a py file alone, must un-hash the last code
 
-THING I ALSO CONTRIBUTED (DETAIL):
-1. HOMEPAGE FUNCTION (PIE/BAR CHART, CALENDAR, NOTEPAD, STATS BOX)
-2. DARKMODE (ADDITIONAL FEATURE)
-3. ALL PY FILES IN MY BRANCH I DID FRONT AND BACKEND
-4. REPORT PY FILE (FINAL VERSION)
+Things I also contributed (detail):
+1. Homepage function (pie/bar chart, calendar, notepad, stats box)
+2. Dark mode (additional feature)
+3. All the py files in my branch, I contributed front and backend
+4. Report py file (final version)
+
