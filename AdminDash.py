@@ -113,7 +113,7 @@ class Dashboard(QWidget):
                 widget.setVisible(False)
 
         # Hide homepage charts and approval table
-        self.stats_container.setVisible(False) # Hide it by default
+        self.stats_container.setVisible(False)
         self.pie_chart_frame.setVisible(False)
         self.bar_chart_frame.setVisible(False)
         self.calendar_frame.setVisible(False)
@@ -137,7 +137,7 @@ class Dashboard(QWidget):
         title_layout.addWidget(self.logo_label)
 
         # Title
-        self.title_text = QLabel("SHELF LIFE MANAGEMENT")
+        self.title_text = QLabel("SHELF LIFE MANAGEMENT SYSTEM")
         self.title_text.setFont(QFont("Gabriola", 25, QFont.Bold))
         self.title_text.setStyleSheet("color: black;")
         self.title_text.setAlignment(Qt.AlignCenter)
@@ -540,7 +540,6 @@ class Dashboard(QWidget):
         """)
         calendar_layout.addWidget(self.calendar_widget)
 
-        # ADD pie chart + notepad + calendar to layout
         top_chart_layout.addWidget(self.pie_chart_frame, 1)
         top_chart_layout.addWidget(self.notepad_panel, 1)
         top_chart_layout.addWidget(self.calendar_frame, 1)
