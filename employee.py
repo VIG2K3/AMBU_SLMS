@@ -56,24 +56,30 @@ def default_admin_Cred():
 create_employee_table()
 default_admin_Cred()
 
-
 class ProductOwnerRegistration(QWidget):
-    def __init__(self):
+    def __init__(self, on_data_changed=None):
         super().__init__()
-        self.setWindowTitle("Employee Registration System")
+        self.on_data_changed = on_data_changed
+        self.setWindowTitle("Employee Registration")
         self.resize(1200, 800)
         self.selected_emp_id = None
+        self.setAttribute(Qt.WA_StyledBackground, True)
+        self.setStyleSheet("""
+            QWidget {
+                background-color: #d9d9d9;
+                color: black;
+            }
+        """)
         self.setup_ui()
         self.load_data()
 
     def setup_ui(self):
-        # Main layout
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(20, 20, 20, 20)
         main_layout.setSpacing(15)
         self.setLayout(main_layout)
 
-        # Search Group (top section)
+        # Search group
         self.create_search_group()
         main_layout.addWidget(self.search_group)
 
@@ -81,7 +87,6 @@ class ProductOwnerRegistration(QWidget):
         self.splitter = QSplitter(Qt.Vertical)
         main_layout.addWidget(self.splitter)
 
-        # Create table widget
         self.create_table_widget()
         table_container = QWidget()
         table_container.setLayout(QVBoxLayout())
@@ -89,7 +94,6 @@ class ProductOwnerRegistration(QWidget):
         table_container.layout().setContentsMargins(0, 0, 0, 0)
         self.splitter.addWidget(table_container)
 
-        # Create employee details form
         self.create_employee_form()
         form_container = QWidget()
         form_container.setLayout(QVBoxLayout())
@@ -97,17 +101,14 @@ class ProductOwnerRegistration(QWidget):
         form_container.layout().setContentsMargins(0, 0, 0, 0)
         self.splitter.addWidget(form_container)
 
-        # Set initial sizes (table takes 70%, form takes 30%)
         self.splitter.setSizes([int(self.height() * 0.7), int(self.height() * 0.3)])
 
-        # Create buttons (bottom section)
         self.create_buttons()
         main_layout.addWidget(self.buttons_container)
 
-        # Apply styles
         self.setStyleSheet("""
-            QWidget { font-family: 'Segoe UI';}
-            QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
+            QWidget {background-color: #d9d9d9; font-family: 'Segoe UI';}
+            QGroupBox {background-color: #d9d9d9; font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}
             QTableWidget {background-color: white; alternate-background-color: #f7f7f7; gridline-color: #e0e0e0; font-size: 12px;}
             QHeaderView::section {background-color: #f0f0f0; padding: 8px; border: 1px solid #d0d0d0; font-weight: bold; text-align: center;}
@@ -116,13 +117,13 @@ class ProductOwnerRegistration(QWidget):
             QPushButton {background-color: #b60338; color: #d9d9d9; border: 1px solid #ccc; border-radius: 4px; padding: 8px 50px; min-width: 100px; font-weight: bold;}
             QPushButton:hover { background-color: #f31659;}
             QPushButton:pressed { background-color: #ff4757;}
-            QLineEdit, QComboBox {padding: 5px; border: 1px solid #ccc; border-radius: 3px;}
+            QLineEdit, QComboBox {padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: red;}
             QCheckBox { spacing: 5px;}""")
 
     def create_search_group(self):
         self.search_group = QGroupBox("SEARCH BAR")
         self.search_group.setStyleSheet("""
-            QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
+            QGroupBox {background-color: #d9d9d9; font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
 
         vbox = QVBoxLayout()
@@ -144,7 +145,7 @@ class ProductOwnerRegistration(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search...")
         self.search_input.setStyleSheet("""
-            QLineEdit {padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 300px; background-color: white;}""")
+            QLineEdit {background-color: #f0f0f0; padding: 8px; border: 1px solid #ccc; border-radius: 3px; min-width: 300px; background-color: white; font-size: 18px;}""")
         search_layout.addWidget(self.search_input)
 
         self.search_button = QPushButton("Search")
@@ -188,7 +189,6 @@ class ProductOwnerRegistration(QWidget):
         header.setDefaultAlignment(Qt.AlignCenter)
         header.setStretchLastSection(True)
 
-        # Set all columns to have equal width using Stretch
         for i in range(7):
             header.setSectionResizeMode(i, QHeaderView.Stretch)
 
@@ -198,7 +198,7 @@ class ProductOwnerRegistration(QWidget):
     def create_employee_form(self):
         self.employee_details_group = QGroupBox("REGISTER PRODUCT OWNER")
         self.employee_details_group.setStyleSheet("""
-            QGroupBox {font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
+            QGroupBox {background-color: #d9d9d9; font-size: 14px; font-weight: bold; border: 1px solid #ccc; border-radius: 5px; margin-top: 10px; padding-top: 15px;}
             QGroupBox::title {subcontrol-origin: margin; left: 10px; padding: 0 3px;}""")
 
         main_layout = QVBoxLayout()
@@ -231,21 +231,21 @@ class ProductOwnerRegistration(QWidget):
         first_name_label.setFont(label_font)
         self.first_name_input = QLineEdit()
         self.first_name_input.setPlaceholderText("Enter first name")
-        self.first_name_input.setStyleSheet("background-color: white;")
+        self.first_name_input.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: white; font-size: 18px;")
         self.first_name_input.setMinimumWidth(250)
 
         last_name_label = QLabel("LAST NAME:")
         last_name_label.setFont(label_font)
         self.last_name_input = QLineEdit()
         self.last_name_input.setPlaceholderText("Enter last name")
-        self.last_name_input.setStyleSheet("background-color: white;")
+        self.last_name_input.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: white; font-size: 18px;")
         self.last_name_input.setMinimumWidth(250)
 
         email_label = QLabel("EMAIL:")
         email_label.setFont(label_font)
         self.email_input = QLineEdit()
         self.email_input.setPlaceholderText("user@example.com")
-        self.email_input.setStyleSheet("background-color: white;")
+        self.email_input.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: white; font-size: 18px;")
         self.email_input.setMinimumWidth(250)
 
         left_column.addRow(first_name_label, self.first_name_input)
@@ -257,14 +257,14 @@ class ProductOwnerRegistration(QWidget):
         username_label.setFont(label_font)
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Enter username")
-        self.username_input.setStyleSheet("background-color: white;")
+        self.username_input.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: white; font-size: 18px;")
         self.username_input.setMinimumWidth(250)
 
         password_label = QLabel("PASSWORD:")
         password_label.setFont(label_font)
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Enter password")
-        self.password_input.setStyleSheet("background-color: white;")
+        self.password_input.setStyleSheet("padding: 5px; border: 1px solid #ccc; border-radius: 3px; background-color: white; font-size: 18px;")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setMinimumWidth(250)
 
@@ -275,7 +275,7 @@ class ProductOwnerRegistration(QWidget):
         role_label = QLabel("ROLE:")
         role_label.setFont(label_font)
         self.role_display = QLabel("Product Owner")
-        self.role_display.setStyleSheet("background-color: white; padding: 7px; border-radius: 3px; border: 1px solid #ccc;")
+        self.role_display.setStyleSheet("background-color: white; padding: 7px; border-radius: 3px; border: 1px solid #ccc; font-size: 18px;")
         right_column.addRow(role_label, self.role_display)
 
         # Right Position
@@ -485,6 +485,9 @@ class ProductOwnerRegistration(QWidget):
                 "INSERT INTO employees (first_name, last_name, username, password, email, role) VALUES (?, ?, ?, ?, ?, ?)",
                 (first, last, username, hashed, email, role))
             conn.commit()
+            if self.on_data_changed:
+                self.on_data_changed()
+
             conn.close()
             self.load_data()
             self.clear_fields()
@@ -624,8 +627,8 @@ class ProductOwnerRegistration(QWidget):
         self.selected_emp_id = None
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ProductOwnerRegistration()
-    window.show()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     window = ProductOwnerRegistration()
+#     window.show()
+#     sys.exit(app.exec_())
