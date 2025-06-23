@@ -116,8 +116,8 @@ class ReportSystem(QWidget):
         # Header styling
         self.active_table.setStyleSheet("""
             QHeaderView::section {
-                background-color: #f0f0f0;
-                color: black;
+                background-color: #b60338;
+                color: white;
                 font-size: 15px;
                 padding: 6px;
                 border: 1px solid #ccc;
@@ -198,11 +198,10 @@ class ReportSystem(QWidget):
             "Barcode", "Test Date", "Created Date", "Status", "Moved Date"
         ])
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-
         self.history_table.setStyleSheet("""
             QHeaderView::section {
-                background-color: #f0f0f0;
-                color: black;
+                background-color: #b60338;
+                color: white;
                 font-size: 15px;
                 padding: 6px;
                 border: 1px solid #ccc;
@@ -388,8 +387,8 @@ class ReportSystem(QWidget):
                 QMessageBox.critical(self, "Export Failed", f"Error occurred:\n{str(e)}")
 
 
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     window = ReportSystem()
-#     window.showMaximized()
-#     sys.exit(app.exec_())
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ReportSystem()
+    window.showMaximized()
+    sys.exit(app.exec_())
