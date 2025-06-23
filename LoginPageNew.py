@@ -24,11 +24,11 @@ conn.commit()
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ambu - SLMS")
+        self.setWindowTitle("Ambu - New Batch Registration")
         self.resize(1900, 1000)
         self.setMinimumSize(1000, 600)
         self.setWindowIcon(QIcon("images/ambu_icon.png"))
-        self.background = QPixmap("images/bg.jpg")
+        self.background = QPixmap("images/bg2.jpg")
         self.init_ui()
 
     def init_ui(self):
@@ -42,7 +42,7 @@ class LoginWindow(QWidget):
         self.blur_background = QFrame(self)
         self.blur_background.setStyleSheet("""
             background-color: rgba(180, 180, 180, 0.30);
-            border: 1px solid rgba(180, 180, 180, 0.3);
+            border: 1px solid rgba(180, 180, 180, 0.03);
         """)
         blur = QGraphicsBlurEffect()
         blur.setBlurRadius(10)
@@ -58,7 +58,7 @@ class LoginWindow(QWidget):
 
         # Profile icon
         self.profile_icon = QLabel()
-        pixmap = QPixmap("images/profile_icon.png").scaled(100, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pixmap = QPixmap("images/profile_icon.png").scaled(100, 95, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.profile_icon.setPixmap(pixmap)
         self.profile_icon.setAlignment(Qt.AlignCenter)
         self.profile_icon.setStyleSheet("background: transparent; border: none;")
@@ -82,7 +82,7 @@ class LoginWindow(QWidget):
                 color: black;
                 padding: 8px;
                 border: none;
-                border-bottom: 3px solid #b60338;
+                border-bottom: 4px solid #b60338;
             }
         """)
         self.username.installEventFilter(self)
@@ -97,7 +97,7 @@ class LoginWindow(QWidget):
                 color: black;
                 padding: 8px;
                 border: none;
-                border-bottom: 3px solid #b60338;
+                border-bottom: 4px solid #b60338;
             }
         """)
         self.password.setEchoMode(QLineEdit.Normal)
