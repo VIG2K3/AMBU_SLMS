@@ -65,7 +65,7 @@ class LoginWindow(QWidget):
         panel_layout.addWidget(self.profile_icon)
 
         # Title
-        self.title = QLabel("ADMIN LOGIN")
+        self.title = QLabel("USER LOGIN")
         self.title.setFont(QFont("Gabriola", 35))
         self.title.setStyleSheet("background: transparent; border: none;")
         self.title.setAlignment(Qt.AlignCenter)
