@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QPainter
 from PyQt5.QtCore import Qt
 
-from AdminDash import Dashboard  # Import dashboard
+from AdminDash import Dashboard
 
 # Database setup
 conn = sqlite3.connect('employees.db')
@@ -58,14 +58,14 @@ class LoginWindow(QWidget):
 
         # Profile icon
         self.profile_icon = QLabel()
-        pixmap = QPixmap("images/profile_icon.png").scaled(100, 90, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pixmap = QPixmap("images/admin.png").scaled(100, 95, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.profile_icon.setPixmap(pixmap)
         self.profile_icon.setAlignment(Qt.AlignCenter)
         self.profile_icon.setStyleSheet("background: transparent; border: none;")
         panel_layout.addWidget(self.profile_icon)
 
         # Title
-        self.title = QLabel("USER LOGIN")
+        self.title = QLabel("LOGIN")
         self.title.setFont(QFont("Gabriola", 35))
         self.title.setStyleSheet("background: transparent; border: none;")
         self.title.setAlignment(Qt.AlignCenter)
