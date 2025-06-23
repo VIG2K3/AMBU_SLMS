@@ -1,4 +1,4 @@
-# If want to run a py file alone, must unhash the last code part..
+If want to run a py file alone, unhash the last part of code (if can't run)
 
 Things I also contributed:
 1. Homepage function (pie/bar chart, calendar, notepad, stats box)
