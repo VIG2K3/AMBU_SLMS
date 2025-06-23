@@ -1,18 +1,24 @@
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QFrame, QMessageBox, QGraphicsDropShadowEffect
+    QTableWidget, QTableWidgetItem, QHeaderView, QLineEdit, QFrame, QMessageBox, QGraphicsDropShadowEffect,
+    QCalendarWidget, QComboBox, QCheckBox, QFileDialog, QScrollArea, QTextEdit
 )
-from PyQt5.QtGui import QIcon, QPixmap, QFont, QColor
-from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QSize, QPropertyAnimation, QRect
+from PyQt5.QtGui import QIcon, QPixmap, QFont, QColor, QTextCharFormat, QBrush
+from PyQt5.QtCore import Qt, QTimer, QDateTime, pyqtSignal, QSize, QPropertyAnimation, QRect, QDate
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from datetime import datetime, timedelta
+import sqlite3
+from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MultipleLocator
+import os
+from collections import defaultdict
 
 # Import Other GUI
 from employee import ProductOwnerRegistration
 from ProductAdmin import ProductManager
-from Approval import ApprovalsWidget
-from Reports import ReportWidget
+from Reports import ReportSystem
 
 
 class Dashboard(QWidget):
@@ -32,7 +38,7 @@ class Dashboard(QWidget):
 
     def toggle_sidebar(self):
         current_width = self.sidebar_container.width()
-        new_width = 0 if current_width > 0 else 400
+        new_width = 0 if current_width > 0 else 360
 
         self.animation = QPropertyAnimation(self.sidebar_container, b"maximumWidth")
         self.animation.setDuration(300)
@@ -40,18 +46,29 @@ class Dashboard(QWidget):
         self.animation.setEndValue(new_width)
         self.animation.start()
 
+        # Optionally animate minimumWidth too for smoother resizing
+        self.animation_min = QPropertyAnimation(self.sidebar_container, b"minimumWidth")
+        self.animation_min.setDuration(300)
+        self.animation_min.setStartValue(current_width)
+        self.animation_min.setEndValue(new_width)
+        self.animation_min.start()
+
+        # Update toggle icon
         if current_width > 0:
             self.toggle_button.setText("☰")
         else:
             self.toggle_button.setText("<")
 
     def show_homepage(self):
-        self.hide_all_internal_views() # Show approval table on homepage
+        self.update_stats()
+        self.refresh_bar_chart()
+        self.refresh_pie_chart()
+        self.hide_all_internal_views()
         self.stats_container.setVisible(True)
         self.pie_chart_frame.setVisible(True)
         self.bar_chart_frame.setVisible(True)
-        self.approval_table.setVisible(True)  
-        self.pending_label.setVisible(True)
+        self.calendar_frame.setVisible(True)
+        self.notepad_panel.setVisible(True)
 
     def open_product_widget(self):
         self.hide_all_internal_views()
@@ -59,13 +76,11 @@ class Dashboard(QWidget):
         if hasattr(self, 'product_widget') and self.product_widget is not None:
             self.product_widget.setVisible(True)
         else:
-            self.product_widget = ProductManager()
+            self.product_widget = ProductManager(
+                on_data_changed=self.update_stats,
+                on_chart_refresh=lambda: self.refresh_all_charts()
+            )
             self.main_content_layout.addWidget(self.product_widget)
-
-    def open_approval_widget(self):
-        self.hide_all_internal_views()
-        if hasattr(self, 'approval_widget') and self.approval_widget is not None:
-            self.approval_widget.setVisible(True)
 
     def open_employee_widget(self):
         self.hide_all_internal_views()
@@ -74,6 +89,7 @@ class Dashboard(QWidget):
             self.employee_widget.setVisible(True)
         else:
             self.employee_widget = ProductOwnerRegistration()
+            self.update_stats()
             self.main_content_layout.addWidget(self.employee_widget)
 
     def open_report_widget(self):
@@ -82,16 +98,14 @@ class Dashboard(QWidget):
         if hasattr(self, 'report_widget') and self.report_widget is not None:
             self.report_widget.setVisible(True)
         else:
-            self.report_widget = ReportWidget()
+            self.report_widget = ReportSystem()
             self.main_content_layout.addWidget(self.report_widget)
 
     def hide_all_internal_views(self):
         widgets_to_hide = [
             "employee_widget",
             "product_widget",
-            "report_widget",
-            "batch_widget",
-            "approval_widget"
+            "report_widget"
         ]
         for attr in widgets_to_hide:
             widget = getattr(self, attr, None)
@@ -102,9 +116,10 @@ class Dashboard(QWidget):
         self.stats_container.setVisible(False) # Hide it by default
         self.pie_chart_frame.setVisible(False)
         self.bar_chart_frame.setVisible(False)
-        self.approval_table.setVisible(False)  
-        self.pending_label.setVisible(False)
-        
+        self.calendar_frame.setVisible(False)
+        self.notepad_panel.setVisible(False)
+
+
     def initUI(self):
         # Title bar spacing
         main_layout = QVBoxLayout(self)
@@ -202,7 +217,8 @@ class Dashboard(QWidget):
 
         # Sidebar container (collapsible)
         self.sidebar_container = QFrame()
-        self.sidebar_container.setMaximumWidth(400)
+        self.sidebar_container.setMaximumWidth(0)
+        self.sidebar_container.setMinimumWidth(0)
         self.sidebar_container.setStyleSheet("background-color: #b60338; border-radius: 15px;")
         sidebar_main_layout = QVBoxLayout(self.sidebar_container)
         sidebar_main_layout.setContentsMargins(0, 0, 0, 0)
@@ -236,6 +252,7 @@ class Dashboard(QWidget):
                 color: white;
             }
         """)
+
         # Sidebar button colour
         self.default_sidebar_style = """
                QPushButton {
@@ -272,9 +289,8 @@ class Dashboard(QWidget):
         # Sidebar buttons with icons
         options = [
             ("HOMEPAGE", "images/home.png"),
-            ("PRODUCT DETAILS", "images/product.png"),
-            ("PENDING APPROVALS", "images/approval.png"),
-            ("PRODUCT OWNERS", "images/employee.png"),
+            ("BATCH DETAILS", "images/approval.png"),
+            ("PRODUCT OWNER", "images/employee.png"),
             ("REPORTS", "images/report.png")
 
         ]
@@ -313,7 +329,7 @@ class Dashboard(QWidget):
         top_bar = QHBoxLayout()
 
         # Toggle button
-        self.toggle_button = QPushButton("<")
+        self.toggle_button = QPushButton("☰")
         self.toggle_button.setFixedSize(50, 50)
         self.toggle_button.setCursor(Qt.PointingHandCursor)
         self.toggle_button.setStyleSheet("""
@@ -348,62 +364,49 @@ class Dashboard(QWidget):
         """)
         top_bar.addWidget(self.dash_title, 4)
         top_bar.addStretch()
-        
-        # Notification label and icon space
-        notif_wrapper = QHBoxLayout()
-        notif_wrapper.setSpacing(5)
 
-        self.bell_text = QLabel("Notification")
-        self.bell_text.setStyleSheet("font-size: 15px;")
-        self.bell_text.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # Profile button
+        profileButton = QHBoxLayout()
+        profileButton.setSpacing(8)
 
-        self.notification_btn = QPushButton()
-        self.notification_btn.setIcon(QIcon("images/bell_icon.png"))
-        self.notification_btn.setIconSize(QSize(50, 50))
-        self.notification_btn.setFixedSize(50, 50)
-        self.notification_btn.setCursor(Qt.PointingHandCursor)
-        self.notification_btn.setStyleSheet("""
-            QPushButton {
-                border: none;
-                border-radius: 25px;
-                background-color: transparent;
-            }
-            QPushButton:hover {
-                background-color: #ffeb5b;
-            }
-        """)
-        self.notification_btn.clicked.connect(self.open_notification_panel)
+        self.profile_text = QLabel("Welcome,\nAdmin")
+        self.profile_text.setStyleSheet("font-size: 14px; color: black; font-family: Arial;")
+        self.profile_text.setAlignment(Qt.AlignVCenter | Qt.AlignRight)
+        self.profile_icon = QLabel()
+        pixmap = QPixmap("images/admin.png")
+        self.profile_icon.setPixmap(pixmap.scaled(50, 50, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        self.profile_icon.setFixedSize(50, 50)
+        self.profile_icon.setStyleSheet("border-radius: 25px; background-color: white;")
 
-        notif_wrapper.addWidget(self.bell_text)
-        notif_wrapper.addWidget(self.notification_btn)
+        # Add both to layout
+        profileButton.addWidget(self.profile_text)
+        profileButton.addWidget(self.profile_icon)
 
-        # Add the notif layout to the top bar
-        top_bar.addLayout(notif_wrapper)
-
-        # Add the top bar to the main layout
+        # Add to top bar and main layout
+        top_bar.addLayout(profileButton)
         self.main_content_layout.addLayout(top_bar)
 
         # Stats boxes
         self.stats_container = QWidget()
-        stats_layout = QHBoxLayout(self.stats_container)  # Set layout during creation
+        stats_layout = QHBoxLayout(self.stats_container)
         stats_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout.setSpacing(10)
 
-        for title in ["Total Batch", "Total Employees" ,"Pending Approvals", "Incoming Maturity"]:
+        for title in ["Total Batch", "Total Product Owner" ,"Pending Approvals", "Incoming Maturity"]:
             box = QVBoxLayout()
-            lbl_title = QLabel(title)
-            lbl_count = QLabel("0")
+            self.lbl_title = QLabel(title)
+            self.lbl_count = QLabel("0")
 
-            lbl_title.setStyleSheet("color: black;")
-            lbl_count.setStyleSheet("font-size: 18px; font-weight: bold;")
+            self.lbl_title.setStyleSheet("color: black; font-size: 19px; font-family: Segoe UI;")
+            self.lbl_count.setStyleSheet("color: black; font-size: 20px; font-weight: bold;")
 
-            box.addWidget(lbl_title)
-            box.addWidget(lbl_count)
+            box.addWidget(self.lbl_title)
+            box.addWidget(self.lbl_count)
 
-            box_frame = QFrame()
-            box_frame.setLayout(box)
-            box_frame.setFixedHeight(120)
-            box_frame.setStyleSheet("""
+            self.box_frame = QFrame()
+            self.box_frame.setLayout(box)
+            self.box_frame.setFixedHeight(140)
+            self.box_frame.setStyleSheet("""
                 QFrame {
                     background-color: white;
                     padding: 10px;
@@ -415,19 +418,18 @@ class Dashboard(QWidget):
             shadow.setBlurRadius(20)
             shadow.setOffset(4, 4)
             shadow.setColor(QColor(0, 0, 0, 50))
-            box_frame.setGraphicsEffect(shadow)
+            self.box_frame.setGraphicsEffect(shadow)
 
-            stats_layout.addWidget(box_frame)
+            stats_layout.addWidget(self.box_frame)
 
         self.main_content_layout.addWidget(self.stats_container)
 
-        # Container for both charts
-        chart_container = QWidget()
-        chart_layout = QHBoxLayout(chart_container)
-        chart_layout.setContentsMargins(0, 0, 0, 0)
-        chart_layout.setSpacing(5)
+        # Chart Panel (Pie/Notepad/Calender)
+        top_chart_layout = QHBoxLayout()
+        top_chart_layout.setContentsMargins(0, 0, 0, 0)
+        top_chart_layout.setSpacing(20)
 
-        # PIE CHART PANEL
+        # Pie chart
         self.pie_chart_frame = QFrame()
         self.pie_chart_frame.setStyleSheet("""
             QFrame {
@@ -445,7 +447,106 @@ class Dashboard(QWidget):
         self.pie_chart_layout.setContentsMargins(10, 10, 10, 10)
         self.create_pie_chart()
 
-        # BAR CHART PANEL
+        # Notepad
+        self.notepad_panel = QFrame()
+        self.notepad_panel.setMinimumSize(300, 300)
+        self.notepad_panel.setMaximumWidth(500)
+        self.notepad_panel.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                color: black;
+                border-radius: 15px;
+            }
+        """)
+        notepad_shadow = QGraphicsDropShadowEffect()
+        notepad_shadow.setBlurRadius(20)
+        notepad_shadow.setOffset(4, 4)
+        notepad_shadow.setColor(QColor(0, 0, 0, 100))
+        self.notepad_panel.setGraphicsEffect(notepad_shadow)
+
+        self.notepad_layout = QVBoxLayout(self.notepad_panel)
+        self.notepad_layout.setContentsMargins(10, 10, 10, 10)
+
+        self.notepad_textedit = QTextEdit()
+        self.notepad_textedit.setPlaceholderText("Write your notes here...")
+        self.notepad_textedit.setFont(QFont("Segoe UI", 11))
+
+        self.save_button = QPushButton("Save Notes")
+        self.save_button.setStyleSheet("""
+            QPushButton {
+                background-color: #b60338;
+                color: white;
+                border-radius: 5px;
+                padding: 6px 12px;
+            }
+            QPushButton:hover {
+                background-color: #d91e4b;
+            }
+        """)
+        self.save_button.setCursor(Qt.PointingHandCursor)
+        self.save_button.clicked.connect(self.save_notes_to_file)
+
+        self.notepad_layout.addWidget(self.notepad_textedit)
+        self.notepad_layout.addWidget(self.save_button)
+
+        # Calender Panel
+        self.highlighted_dates = set()
+
+        self.calendar_frame = QFrame()
+        self.calendar_frame.setMinimumSize(300, 300)
+        self.calendar_frame.setMaximumWidth(500)
+        self.calendar_frame.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border-radius: 15px;
+            }
+        """)
+        calendar_shadow = QGraphicsDropShadowEffect()
+        calendar_shadow.setBlurRadius(20)
+        calendar_shadow.setOffset(4, 4)
+        calendar_shadow.setColor(QColor(0, 0, 0, 100))
+        self.calendar_frame.setGraphicsEffect(calendar_shadow)
+
+        calendar_layout = QVBoxLayout(self.calendar_frame)
+        calendar_layout.setContentsMargins(10, 10, 10, 10)
+
+        self.calendar_widget = QCalendarWidget()
+        self.calendar_widget.setGridVisible(True)
+        self.calendar_widget.setHorizontalHeaderFormat(QCalendarWidget.ShortDayNames)
+        self.calendar_widget.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+        self.calendar_widget.setDateEditEnabled(False)
+
+        self.calendar_widget.setStyleSheet("""
+            QCalendarWidget {
+                background-color: white;
+                border-radius: 10px;
+                font-family: Segoe UI;
+                font-size: 14px;
+            }
+            QCalendarWidget QToolButton {
+                background-color: #d9d9d9;
+                color: black;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QCalendarWidget QAbstractItemView:enabled {
+                selection-background-color: #b60338;
+                background-color: white;
+                color: black;
+            }
+            QCalendarWidget QAbstractItemView::item:disabled {
+                color: white;
+            }
+        """)
+        calendar_layout.addWidget(self.calendar_widget)
+
+        # ADD pie chart + notepad + calendar to layout
+        top_chart_layout.addWidget(self.pie_chart_frame, 1)
+        top_chart_layout.addWidget(self.notepad_panel, 1)
+        top_chart_layout.addWidget(self.calendar_frame, 1)
+        self.main_content_layout.addLayout(top_chart_layout)
+
+        # Bar chart
         self.bar_chart_frame = QFrame()
         self.bar_chart_frame.setStyleSheet("""
             QFrame {
@@ -459,99 +560,78 @@ class Dashboard(QWidget):
         bar_shadow.setColor(QColor(0, 0, 0, 0))
         self.bar_chart_frame.setGraphicsEffect(bar_shadow)
 
-        self.bar_chart_layout = QVBoxLayout(self.bar_chart_frame)
+        self.bar_chart_layout = QVBoxLayout()
+        self.bar_chart_frame.setLayout(self.bar_chart_layout)
         self.bar_chart_layout.setContentsMargins(10, 10, 10, 10)
         self.create_bar_chart()
 
-        # Add both to layout
-        chart_layout.addWidget(self.pie_chart_frame, 1)
-        chart_layout.addWidget(self.bar_chart_frame, 2)
+        # Add bar chart to layout (below)
+        self.main_content_layout.addWidget(self.bar_chart_frame)
 
-        # Add to main layout
-        self.main_content_layout.addWidget(chart_container)
-
-        # Approval Table
-        self.pending_label = QLabel("PENDING APPROVALS:")
-        self.pending_label.setFont(QFont("Gabriola", 17, QFont.Bold))
-        self.pending_label.setStyleSheet("color: black; background-color: transparent;")
-
-        self.approval_table = QTableWidget(10, 6)
-        self.approval_table.setHorizontalHeaderLabels(
-            ["BATCH ID", "BATCH NAME", "QUANTITY", "IN DATE", "DUE DATE", "STATUS"])
-        self.approval_table.verticalHeader().setVisible(False)
-        self.approval_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.approval_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.approval_table.setFixedHeight(240)
-        self.approval_table.setStyleSheet("""
-            QTableWidget {
-                background-color: white;
-                color: black;
-                border-radius: 5px;
-            }
-            QHeaderView::section {
-                background-color: #f0f0f0;
-                color: black;
-                font-size: 23px;
-                font-weight: bold;
-                font-family: Gabriola;
-            }
-        """)
-
-        # Sample approval data
-        sample_approvals = [
-            ("REQ001", "", "Batch", "", "Pending"),
-            ("REQ002", "", "Leave", "", "Approved"),
-            ("REQ003", "", "Batch", "", "Rejected"),
-            ("REQ004", "", "Leave", "", "Pending"),
-            ("REQ005", "", "Batch", "", "Pending")
-        ]
-
-        for row, (req_id, name, req_type, date, status) in enumerate(sample_approvals):
-            self.approval_table.setItem(row, 0, QTableWidgetItem(req_id))
-            self.approval_table.setItem(row, 1, QTableWidgetItem(name))
-            self.approval_table.setItem(row, 2, QTableWidgetItem(req_type))
-            self.approval_table.setItem(row, 3, QTableWidgetItem(date))
-
-            status_item = QTableWidgetItem(status)
-            color = {"Pending": "orange", "Approved": "green", "Rejected": "red"}.get(status, "black")
-            status_item.setForeground(QColor(color))
-            self.approval_table.setItem(row, 4, status_item)
-
-        # Create the approval widget page (used for Pending Approvals)
-        self.approval_widget = ApprovalsWidget()
-        self.main_content_layout.addWidget(self.approval_widget)
-        self.approval_widget.setVisible(False)
-
-        # Approval Table only used on homepage, added here and hidden initially
-        self.main_content_layout.addWidget(self.pending_label)
-        self.approval_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.main_content_layout.addWidget(self.approval_table)
-        self.approval_table.setVisible(False)
-
-        # Wrap up the main content widget
+        # Combine main content
         self.content_widget = QWidget()
         self.content_widget.setLayout(self.main_content_layout)
         content_layout.addWidget(self.content_widget, 8)
-
         main_layout.addLayout(content_layout)
 
+        # Footer
         self.footer = QLabel(None)
+        self.update_stats()
         self.footer.setFont(QFont("Times New Roman", 12))
         self.footer.setStyleSheet("background-color: #b60338; color: black;")
         self.footer.setAlignment(Qt.AlignCenter)
         self.footer.setFixedHeight(30)
         main_layout.addWidget(self.footer)
 
-        self.show_homepage()
+    def save_notes_to_file(self):
+        path, _ = QFileDialog.getSaveFileName(self, "Save Notes", "notes.txt", "Text Files (*.txt);;All Files (*)")
+        if path:
+            try:
+                with open(path, "w", encoding="utf-8") as file:
+                    file.write(self.notepad_textedit.toPlainText())
+                QMessageBox.information(self, "Saved", "Notes saved successfully!")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to save notes:\n{str(e)}")
+
+    def refresh_all_charts(self):
+        self.refresh_bar_chart()
+        self.refresh_pie_chart()
+
+    def refresh_bar_chart(self):
+        if not hasattr(self, 'bar_chart_layout'):
+            print("bar_chart_layout does not exist yet.")
+            return
+
+        # Clear current chart
+        for i in reversed(range(self.bar_chart_layout.count())):
+            widget = self.bar_chart_layout.itemAt(i).widget()
+            if widget is not None:
+                self.bar_chart_layout.removeWidget(widget)
+                widget.setParent(None)
+
+        # Rebuild with live data
+        self.create_bar_chart()
+
+    def refresh_pie_chart(self):
+        if not hasattr(self, 'pie_chart_layout'):
+            print("pie_chart_layout does not exist yet.")
+            return
+
+        # Clear current pie chart
+        for i in reversed(range(self.pie_chart_layout.count())):
+            widget = self.pie_chart_layout.itemAt(i).widget()
+            if widget is not None:
+                self.pie_chart_layout.removeWidget(widget)
+                widget.setParent(None)
+
+        # Rebuild with live data
+        self.create_pie_chart()
 
     def update_clock(self):
         current_datetime = QDateTime.currentDateTime()
         date_str = current_datetime.toString("dd-MM-yyyy")
         time_str = current_datetime.toString("HH:mm:ss")
         self.lbl_clock.setText(f"Date: {date_str}    Time: {time_str}")
-
-    def open_notification_panel(self):
-        QMessageBox.information(self, "Notifications", "No new notifications.")
 
     def handle_sidebar_click(self, button, option):
         for btn in self.sidebar_buttons:
@@ -562,14 +642,67 @@ class Dashboard(QWidget):
 
         if option == "HOMEPAGE":
             self.show_homepage()
-        elif option == "PRODUCT DETAILS":
+        elif option == "BATCH DETAILS":
             self.open_product_widget()
-        elif option == "PENDING APPROVALS":
-            self.open_approval_widget()
-        elif option == "PRODUCT OWNERS":
+        elif option == "PRODUCT OWNER":
             self.open_employee_widget()
         elif option == "REPORTS":
             self.open_report_widget()
+
+    def update_stats(self):
+        total_batch = 0
+        total_product_owner = 0
+        pending_approvals = 0
+        incoming_maturity = 0
+
+        try:
+            conn = sqlite3.connect("Product.db")
+            cur = conn.cursor()
+
+            # Total approved (Total Batch)
+            cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Approved'")
+            total_batch = cur.fetchone()[0]
+
+            # Pending approvals
+            cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Pending'")
+            pending_approvals = cur.fetchone()[0]
+
+            # Incoming maturity (for 2 months/ approved)
+            cur.execute(
+                "SELECT test_date FROM products WHERE status = 'Approved' AND test_date IS NOT NULL AND test_date != ''")
+            all_test_dates = cur.fetchall()
+            today = datetime.today()
+            in_60_days = today + timedelta(days=60)
+
+            for (test_date_str,) in all_test_dates:
+                try:
+                    test_date = datetime.strptime(test_date_str, "%d-%m-%Y")
+                    if today <= test_date <= in_60_days:
+                        incoming_maturity += 1
+                except ValueError:
+                    continue
+
+            conn.close()
+        except Exception as e:
+            print("Error updating product stats:", e)
+
+        try:
+            conn = sqlite3.connect("employees.db")
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM employees")
+            total_product_owner = cur.fetchone()[0]
+            conn.close()
+        except:
+            total_product_owner = 0
+
+        # Update the stat box labels
+        stat_titles = ["Total Batch", "Total Product Owner", "Pending Approvals", "Incoming Maturity"]
+        stat_values = [total_batch, total_product_owner, pending_approvals, incoming_maturity]
+
+        labels = self.stats_container.findChildren(QLabel)
+        for i in range(len(labels)):
+            if labels[i].text() in stat_titles:
+                labels[i + 1].setText(str(stat_values[stat_titles.index(labels[i].text())]))
 
     def confirm_logout(self):
         msg_box = QMessageBox(self)
@@ -608,12 +741,49 @@ class Dashboard(QWidget):
         # Light Mode
         if self.dark_mode:
             self.setStyleSheet("background-color: #d9d9d9;")
-            self.bell_text.setStyleSheet("color: black;")
+            self.profile_text.setStyleSheet("color: black;")
             self.lbl_clock.setStyleSheet("background-color: #b60338; color: black;")
             self.sidebar_widget.setStyleSheet("background-color: #b60338; color: white; border-top-right-radius: 15px; border-bottom-right-radius: 15px;")
             self.toggle_panel.setStyleSheet("background-color: #b60338; border-radius: 15px;")
             self.sidebar_container.setStyleSheet("background-color: #b60338; border-radius: 15px;")
+
+            self.default_sidebar_style = """
+                           QPushButton {
+                               text-align: left;
+                               padding: 5px 30px;
+                               color: black;
+                               background: #f5f5f5;
+                               border: none;
+                               border-radius: 20px;
+                               font-weight: bold;
+                               font-family: Gabriola;
+                               box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+                           }
+                           QPushButton:hover {
+                               background-color: #da0041;
+                               color: white;
+                           }
+                           """
+
+            self.active_sidebar_style = """
+                           QPushButton {
+                               text-align: left;
+                               padding: 5px 30px;
+                               color: white;
+                               background-color: #da0041;
+                               border: none;
+                               border-radius: 20px;
+                               font-weight: bold;
+                               font-family: Gabriola;
+                               box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+                           }
+                           """
+            self.toggle_button.setStyleSheet("""QPushButton {background-color: #f5f5f5;color: black;font-size: 24px;font-weight: bold;border: none;border-radius: 5px;}QPushButton:hover {background-color: #da0041;color: white;}""")
             self.footer.setStyleSheet("background-color: #b60338; color: black;")
+            self.pie_chart_frame.setStyleSheet("""QFrame {background-color: white;border-radius: 15px;}""")
+            self.save_button.setStyleSheet("""QPushButton {background-color: #b60338; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: #d91e4b;}""")
+            self.calendar_frame.setStyleSheet("""QFrame {background-color: white;border-radius: 15px;}""")
+            self.bar_chart_frame.setStyleSheet("""QFrame {background-color: white;border-radius: 15px;}""")
             self.dash_title.setStyleSheet("border-radius: none; font-size: 35px; color: black; background-color: transparent; font-family: Gabriola;")
             self.title_text.setStyleSheet("color: black;")
             self.logout_btn.setStyleSheet("QPushButton {padding: 5px 15px; background-color: #f5f5f5; color: black; border-radius: 20px; font-size: 18px; border: 1px solid black; font-weight: bold; font-family: Gabriola; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);} QPushButton:hover {background-color: #da0041; color: white;}")
@@ -627,12 +797,47 @@ class Dashboard(QWidget):
         else:
             # Dark Mode
             self.setStyleSheet("background-color: #121212;")
-            self.bell_text.setStyleSheet("color: white;")
+            self.profile_text.setStyleSheet("color: white;")
             self.lbl_clock.setStyleSheet("background-color: #333; color: white;")
             self.sidebar_widget.setStyleSheet("background-color: #333; color: white; border-top-right-radius: 15px; border-bottom-right-radius: 15px;")
             self.toggle_panel.setStyleSheet("background-color: #333; border-radius: 15px;")
             self.sidebar_container.setStyleSheet("background-color: #333; border-radius: 15px;")
+
+            self.default_sidebar_style = """
+                           QPushButton {
+                               text-align: left;
+                               padding: 5px 30px;
+                               color: white;
+                               background: #121212;
+                               border: none;
+                               border-radius: 20px;
+                               font-weight: bold;
+                               font-family: Gabriola;
+                               box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+                           }
+                           QPushButton:hover {
+                               background-color: background-color: rgba(255, 255, 255, 0.40);
+                           }
+                           """
+
+            self.active_sidebar_style = """
+                           QPushButton {
+                               text-align: left;
+                               padding: 5px 30px;
+                               color: white;
+                               background-color: rgba(255, 255, 255, 0.40);
+                               border: none;
+                               border-radius: 20px;
+                               font-weight: bold;
+                               font-family: Gabriola;
+                               box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);
+                           }
+                           """
+            self.toggle_button.setStyleSheet("""QPushButton {background-color: white;color: black;font-size: 24px;font-weight: bold;border: none;border-radius: 5px;}QPushButton:hover {background-color: rgba(255, 255, 255, 0.40);color: white;}""")
             self.footer.setStyleSheet("background-color: #333; color: white;")
+            self.pie_chart_frame.setStyleSheet("""QFrame {background-color: white; border-radius: 15px;}""")
+            self.save_button.setStyleSheet("""QPushButton {background-color: #333; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: rgba(180, 180, 180, 0.40); color: black;}""")
+            self.bar_chart_frame.setStyleSheet("""QFrame {background-color: white ;border-radius: 15px;}""")
             self.dash_title.setStyleSheet("border-radius: none; font-size: 35px; color: white; background-color: transparent; font-family: Gabriola;")
             self.title_text.setStyleSheet("color: white;")
             self.logout_btn.setStyleSheet("QPushButton {padding: 5px 15px; background-color: #f5f5f5; color: black; border-radius: 20px; font-size: 18px; border: 1px solid black; font-weight: bold; font-family: Gabriola; box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.2);} QPushButton:hover {background-color: #da0041; color: white;}")
@@ -645,14 +850,51 @@ class Dashboard(QWidget):
             self.dark_mode = True
 
     def create_pie_chart(self):
+        if hasattr(self, 'pie_chart_canvas'):
+            self.pie_chart_layout.removeWidget(self.pie_chart_canvas)
+            self.pie_chart_canvas.setParent(None)
+
         self.pie_figure = Figure(figsize=(4, 4), dpi=100)
         ax = self.pie_figure.add_subplot(111)
         self.pie_figure.subplots_adjust(top=0.80)
 
-        labels = ['Approved', 'Pending', 'Rejected']
-        sizes = [45, 35, 20]
-        colors = ['#77b6ea', '#d95d39', '#b60338']
-        explode = (0.05, 0.05, 0.05)
+        # Step 1: Fetch status counts from database
+        status_counts = {"Approved": 0, "Pending": 0, "Rejected": 0}
+
+        try:
+            conn = sqlite3.connect("Product.db")
+            cur = conn.cursor()
+            cur.execute("SELECT status FROM products")
+            results = cur.fetchall()
+            conn.close()
+
+            for (status,) in results:
+                if status in status_counts:
+                    status_counts[status] += 1
+        except Exception as e:
+            print("Error loading pie chart data:", e)
+
+        labels = []
+        sizes = []
+        colors = []
+        color_map = {
+            "Approved": '#4a7c59',
+            "Pending": '#f2a541',
+            "Rejected": '#b60338'
+        }
+
+        for status, count in status_counts.items():
+            if count > 0:
+                labels.append(status)
+                sizes.append(count)
+                colors.append(color_map[status])
+
+        if not sizes:
+            labels = ['No Data']
+            sizes = [1]
+            colors = ['#cccccc']
+
+        explode = [0.05] * len(sizes)
 
         wedges, texts, autotexts = ax.pie(
             sizes,
@@ -668,11 +910,11 @@ class Dashboard(QWidget):
         for t in texts + autotexts:
             t.set_fontname("Segoe UI")
 
-        ax.set_title("APPROVAL REQUEST", fontweight="bold", fontsize=12, pad=20, fontname="Segoe UI")
+        ax.set_title("BATCH STATUS", fontweight="bold", fontsize=14, pad=20, fontname="Candara")
         ax.axis('equal')
 
-        canvas = FigureCanvas(self.pie_figure)
-        self.pie_chart_layout.addWidget(canvas)
+        self.pie_chart_canvas = FigureCanvas(self.pie_figure)
+        self.pie_chart_layout.addWidget(self.pie_chart_canvas)
 
     def create_bar_chart(self):
         if hasattr(self, 'bar_chart_canvas'):
@@ -682,23 +924,54 @@ class Dashboard(QWidget):
         self.figure = Figure(figsize=(5, 3), dpi=100)
         ax = self.figure.add_subplot(111)
 
-        categories = list(range(1, 11))
-        activity = [20, 35, 30, 35, 27, 25, 40, 45, 38, 42]
-        goal = [34, 40, 50, 45, 30, 35, 50, 50, 45, 48]
+        categories = []
+        activity = []
 
-        bar_width = 0.35
+        if os.path.exists("Product.db"):
+            try:
+                conn = sqlite3.connect("Product.db")
+                cur = conn.cursor()
+
+                cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
+                if cur.fetchone():
+                    cur.execute("SELECT category, quantity FROM products WHERE status = 'Approved'")
+                    results = cur.fetchall()
+
+                    category_totals = defaultdict(int)
+                    for row in results:
+                        category, qty = row
+                        try:
+                            category_totals[category] += int(qty)
+                        except:
+                            continue
+
+                    categories = list(category_totals.keys())
+                    activity = list(category_totals.values())
+
+                conn.close()
+            except Exception as e:
+                print("Error reading from Product.db:", e)
+
+        if not categories:
+            categories = ["No Data"]
+            activity = [0]
+
+        bar_width = 0.5
         x_indexes = range(len(categories))
+        activity_color = '#4aadaa'
 
-        activity_color = '#b60338'
-        goal_color = '#d9d9d9'
+        ax.bar(x_indexes, activity, width=bar_width, label="Total Quantity", color=activity_color)
 
-        ax.bar([x - bar_width / 2 for x in x_indexes], activity, width=bar_width, label="Test1",
-               color=activity_color)
-        ax.bar([x + bar_width / 2 for x in x_indexes], goal, width=bar_width, label="Test2", color=goal_color)
+        max_val = max(activity) if activity else 0
+        lower = 0
+        upper = ((max_val // 100) + 2) * 100 if max_val > 0 else 100
+        ax.set_ylim(lower, upper)
+        ax.yaxis.set_major_locator(MultipleLocator(100))
 
         ax.set_xticks(x_indexes)
-        ax.set_xticklabels(categories)
-        ax.set_title(" MONTHLY BATCH", fontweight='bold', fontsize=12, fontname="Segoe UI")
+        ax.set_xticklabels(categories, rotation=0, ha='center')
+        ax.set_ylabel("TOTAL QUANTITY")
+        ax.set_title("BATCH DISTRIBUTION BY CATEGORY",fontweight="bold", fontsize=14, fontname="Candara")
         ax.legend(loc='upper right')
         ax.grid(axis='y', linestyle='--', alpha=0.3)
 
