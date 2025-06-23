@@ -1,6 +1,6 @@
-# If want to run a py file alone, must un-hash the last code
+# If want to run a py file alone, must unhash the last code part..
 
-Things I also contributed (detail):
+Things I also contributed:
 1. Homepage function (pie/bar chart, calendar, notepad, stats box)
 2. Dark mode (additional feature)
 3. All the py files in my branch, I contributed front and backend
