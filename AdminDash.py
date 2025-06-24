@@ -983,8 +983,8 @@ class Dashboard(QWidget):
         self.bar_chart_layout.addWidget(self.bar_chart_canvas)
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    dashboard = Dashboard()
-    dashboard.showFullScreen()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     dashboard = Dashboard()
+#     dashboard.showFullScreen()
+#     sys.exit(app.exec_())
