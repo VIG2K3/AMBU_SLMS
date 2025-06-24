@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QFont, QPixmap, QIcon, QPainter
 from PyQt5.QtCore import Qt
 
-from AdminDash import Dashboard
+from BatchForm import NewBatchForm  # Import form
 
 # Database setup
 conn = sqlite3.connect('employees.db')
@@ -24,11 +24,11 @@ conn.commit()
 class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Ambu - SLMS")
+        self.setWindowTitle("Ambu - New Batch Registration")
         self.resize(1900, 1000)
         self.setMinimumSize(1000, 600)
         self.setWindowIcon(QIcon("images/ambu_icon.png"))
-        self.background = QPixmap("images/bg.jpg")
+        self.background = QPixmap("images/bg2.jpg")
         self.init_ui()
 
     def init_ui(self):
@@ -42,7 +42,7 @@ class LoginWindow(QWidget):
         self.blur_background = QFrame(self)
         self.blur_background.setStyleSheet("""
             background-color: rgba(180, 180, 180, 0.30);
-            border: 1px solid rgba(180, 180, 180, 0.3);
+            border: 1px solid rgba(180, 180, 180, 0.03);
         """)
         blur = QGraphicsBlurEffect()
         blur.setBlurRadius(10)
@@ -58,14 +58,14 @@ class LoginWindow(QWidget):
 
         # Profile icon
         self.profile_icon = QLabel()
-        pixmap = QPixmap("images/admin.png").scaled(100, 95, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pixmap = QPixmap("images/profile_icon.png").scaled(100, 95, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.profile_icon.setPixmap(pixmap)
         self.profile_icon.setAlignment(Qt.AlignCenter)
         self.profile_icon.setStyleSheet("background: transparent; border: none;")
         panel_layout.addWidget(self.profile_icon)
 
         # Title
-        self.title = QLabel("LOGIN")
+        self.title = QLabel("USER LOGIN")
         self.title.setFont(QFont("Gabriola", 35))
         self.title.setStyleSheet("background: transparent; border: none;")
         self.title.setAlignment(Qt.AlignCenter)
@@ -82,7 +82,7 @@ class LoginWindow(QWidget):
                 color: black;
                 padding: 8px;
                 border: none;
-                border-bottom: 3px solid #b60338;
+                border-bottom: 4px solid #b60338;
             }
         """)
         self.username.installEventFilter(self)
@@ -97,7 +97,7 @@ class LoginWindow(QWidget):
                 color: black;
                 padding: 8px;
                 border: none;
-                border-bottom: 3px solid #b60338;
+                border-bottom: 4px solid #b60338;
             }
         """)
         self.password.setEchoMode(QLineEdit.Normal)
@@ -177,27 +177,18 @@ class LoginWindow(QWidget):
             return
 
         hashed = self.hash_password(password)
-
-        # Connect to database and check credentials with role
-        conn = sqlite3.connect("employees.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT role FROM employees WHERE username = ? AND password = ?", (username, hashed))
+        cursor.execute("SELECT * FROM employees WHERE username = ? AND password = ?", (username, hashed))
         result = cursor.fetchone()
-        conn.close()
 
         if result:
-            role = result[0]
-            if role != "Admin":
-                QMessageBox.critical(self, "Access Denied", "Only Admins can access this login.")
-                return
-            self.open_dashboard()  # Login success
+            self.open_form()
         else:
             QMessageBox.critical(self, "Login Failed", "Invalid username or password.")
 
-    def open_dashboard(self):
-        self.dashboard = Dashboard()
-        self.dashboard.logout_signal.connect(self.show_login_again)  # Reopen login on logout
-        self.dashboard.showFullScreen()
+    def open_form(self):
+        self.NewBatchForm = NewBatchForm()
+        self.NewBatchForm.logout_signal.connect(self.show_login_again)  # Reopen login on logout
+        self.NewBatchForm.showFullScreen()
         self.hide()  # Hide login not close
 
     def show_login_again(self):
