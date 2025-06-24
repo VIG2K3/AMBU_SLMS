@@ -309,7 +309,7 @@ class Dashboard(QWidget):
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(15)
             shadow.setOffset(2, 2)
-            shadow.setColor(QColor(0, 0, 0, 100))
+            shadow.setColor(QColor(20, 20, 20, 20))
             btn.setGraphicsEffect(shadow)
 
             sidebar_layout.addWidget(btn)
@@ -417,7 +417,7 @@ class Dashboard(QWidget):
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(20)
             shadow.setOffset(4, 4)
-            shadow.setColor(QColor(0, 0, 0, 50))
+            shadow.setColor(QColor(20, 20, 20, 20))
             self.box_frame.setGraphicsEffect(shadow)
 
             stats_layout.addWidget(self.box_frame)
@@ -440,7 +440,7 @@ class Dashboard(QWidget):
         pie_shadow = QGraphicsDropShadowEffect()
         pie_shadow.setBlurRadius(20)
         pie_shadow.setOffset(4, 4)
-        pie_shadow.setColor(QColor(0, 0, 0, 0))
+        pie_shadow.setColor(QColor(20, 20, 20, 20))
         self.pie_chart_frame.setGraphicsEffect(pie_shadow)
 
         self.pie_chart_layout = QVBoxLayout(self.pie_chart_frame)
@@ -461,7 +461,7 @@ class Dashboard(QWidget):
         notepad_shadow = QGraphicsDropShadowEffect()
         notepad_shadow.setBlurRadius(20)
         notepad_shadow.setOffset(4, 4)
-        notepad_shadow.setColor(QColor(0, 0, 0, 100))
+        notepad_shadow.setColor(QColor(20, 20, 20, 20))
         self.notepad_panel.setGraphicsEffect(notepad_shadow)
 
         self.notepad_layout = QVBoxLayout(self.notepad_panel)
@@ -504,7 +504,7 @@ class Dashboard(QWidget):
         calendar_shadow = QGraphicsDropShadowEffect()
         calendar_shadow.setBlurRadius(20)
         calendar_shadow.setOffset(4, 4)
-        calendar_shadow.setColor(QColor(0, 0, 0, 100))
+        calendar_shadow.setColor(QColor(20, 20, 20, 20))
         self.calendar_frame.setGraphicsEffect(calendar_shadow)
 
         calendar_layout = QVBoxLayout(self.calendar_frame)
@@ -555,7 +555,7 @@ class Dashboard(QWidget):
         bar_shadow = QGraphicsDropShadowEffect()
         bar_shadow.setBlurRadius(25)
         bar_shadow.setOffset(4, 4)
-        bar_shadow.setColor(QColor(0, 0, 0, 0))
+        bar_shadow.setColor(QColor(20, 20, 20, 20))
         self.bar_chart_frame.setGraphicsEffect(bar_shadow)
 
         self.bar_chart_layout = QVBoxLayout()
@@ -965,7 +965,7 @@ class Dashboard(QWidget):
         x_indexes = range(len(categories))
         activity_color = '#4aadaa'
 
-        ax.bar(x_indexes, activity, width=bar_width, label="CATEGORIES", color=activity_color)
+        ax.bar(x_indexes, activity, width=bar_width, label="Category", color=activity_color)
 
         max_val = max(activity) if activity else 0
         lower = 0
