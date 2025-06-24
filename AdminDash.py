@@ -515,7 +515,6 @@ class Dashboard(QWidget):
         self.calendar_widget.setHorizontalHeaderFormat(QCalendarWidget.ShortDayNames)
         self.calendar_widget.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.calendar_widget.setDateEditEnabled(False)
-
         self.calendar_widget.setStyleSheet("""
             QCalendarWidget {
                 background-color: white;
@@ -712,20 +711,27 @@ class Dashboard(QWidget):
         if self.dark_mode:
             msg_box.setStyleSheet("""
                 QMessageBox {
-                    background-color: #121212;
+                    background-color: #d9d9d9;
                     color: white;
                     font-size: 16px;
                 }
                 QLabel {
-                    color: white;
+                    background-color: #d9d9d9;
+                    color: black;
                     font-size: 16px;
                 }
                 QPushButton {
-                    background-color: white;
-                    color: black;
+                    background-color: #d9d9d9;
+                    color: white;
+                    padding: 6px 12px;
+                    border: 1px solid white;
+                    border-radius: 4px;
                 }
                 QPushButton:hover {
-                    background-color: #121212;
+                    background-color: #3d3d3d;
+                }
+                QPushButton:pressed {
+                    background-color: #555555;
                 }
             """)
         else:
@@ -835,7 +841,7 @@ class Dashboard(QWidget):
             self.toggle_button.setStyleSheet("""QPushButton {background-color: white;color: black;font-size: 24px;font-weight: bold;border: none;border-radius: 5px;}QPushButton:hover {background-color: rgba(255, 255, 255, 0.40);color: white;}""")
             self.footer.setStyleSheet("background-color: #333; color: white;")
             self.pie_chart_frame.setStyleSheet("""QFrame {background-color: white; border-radius: 15px;}""")
-            self.save_button.setStyleSheet("""QPushButton {background-color: #333; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: rgba(180, 180, 180, 0.40); color: black;}""")
+            self.save_button.setStyleSheet("""QPushButton {background-color: black; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: black; color: white;}""")
             self.bar_chart_frame.setStyleSheet("""QFrame {background-color: white ;border-radius: 15px;}""")
             self.dash_title.setStyleSheet("border-radius: none; font-size: 35px; color: white; background-color: transparent; font-family: Gabriola;")
             self.title_text.setStyleSheet("color: white;")
@@ -959,7 +965,7 @@ class Dashboard(QWidget):
         x_indexes = range(len(categories))
         activity_color = '#4aadaa'
 
-        ax.bar(x_indexes, activity, width=bar_width, label="Total Quantity", color=activity_color)
+        ax.bar(x_indexes, activity, width=bar_width, label="CATEGORIES", color=activity_color)
 
         max_val = max(activity) if activity else 0
         lower = 0
@@ -969,8 +975,8 @@ class Dashboard(QWidget):
 
         ax.set_xticks(x_indexes)
         ax.set_xticklabels(categories, rotation=0, ha='center')
-        ax.set_ylabel("TOTAL QUANTITY")
-        ax.set_title("BATCH DISTRIBUTION BY CATEGORY",fontweight="bold", fontsize=14, fontname="Candara")
+        ax.set_ylabel("TOTAL QUANTITY", fontweight="bold", fontsize=14, fontname="Candara")
+        ax.set_title("BATCH DISTRIBUTION",fontweight="bold", fontsize=14, fontname="Candara")
         ax.legend(loc='upper right')
         ax.grid(axis='y', linestyle='--', alpha=0.3)
 
