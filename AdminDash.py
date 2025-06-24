@@ -392,7 +392,7 @@ class Dashboard(QWidget):
         stats_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout.setSpacing(10)
 
-        for title in ["Total Batch", "Total Product Owner" ,"Pending Approvals", "Incoming Maturity"]:
+        for title in ["Total Batch Approved", "Total Users" ,"Pending Approvals", "Incoming Maturity"]:
             box = QVBoxLayout()
             self.lbl_title = QLabel(title)
             self.lbl_count = QLabel("0")
@@ -573,7 +573,7 @@ class Dashboard(QWidget):
         main_layout.addLayout(content_layout)
 
         # Footer
-        self.footer = QLabel(None)
+        self.footer = QLabel("Copyright ©2025 Ambu A/S")
         self.update_stats()
         self.footer.setFont(QFont("Times New Roman", 12))
         self.footer.setStyleSheet("background-color: #b60338; color: black;")
@@ -648,8 +648,8 @@ class Dashboard(QWidget):
             self.open_report_widget()
 
     def update_stats(self):
-        total_batch = 0
-        total_product_owner = 0
+        total_batch_approved = 0
+        total_users = 0
         pending_approvals = 0
         incoming_maturity = 0
 
@@ -659,7 +659,7 @@ class Dashboard(QWidget):
 
             # Total approved (Total Batch)
             cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Approved'")
-            total_batch = cur.fetchone()[0]
+            total_batch_approved = cur.fetchone()[0]
 
             # Pending approvals
             cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Pending'")
@@ -688,14 +688,14 @@ class Dashboard(QWidget):
             conn = sqlite3.connect("employees.db")
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM employees")
-            total_product_owner = cur.fetchone()[0]
+            total_users = cur.fetchone()[0]
             conn.close()
         except:
-            total_product_owner = 0
+            total_users = 0
 
         # Update the stat box labels
-        stat_titles = ["Total Batch", "Total Product Owner", "Pending Approvals", "Incoming Maturity"]
-        stat_values = [total_batch, total_product_owner, pending_approvals, incoming_maturity]
+        stat_titles = ["Total Batch Approved", "Total Users", "Pending Approvals", "Incoming Maturity"]
+        stat_values = [total_batch_approved, total_users, pending_approvals, incoming_maturity]
 
         labels = self.stats_container.findChildren(QLabel)
         for i in range(len(labels)):
