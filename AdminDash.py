@@ -309,7 +309,7 @@ class Dashboard(QWidget):
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(15)
             shadow.setOffset(2, 2)
-            shadow.setColor(QColor(0, 0, 0, 100))
+            shadow.setColor(QColor(20, 20, 20, 20))
             btn.setGraphicsEffect(shadow)
 
             sidebar_layout.addWidget(btn)
@@ -392,7 +392,7 @@ class Dashboard(QWidget):
         stats_layout.setContentsMargins(0, 0, 0, 0)
         stats_layout.setSpacing(10)
 
-        for title in ["Total Batch", "Total Product Owner" ,"Pending Approvals", "Incoming Maturity"]:
+        for title in ["Total Batch Approved", "Total Users" ,"Pending Approvals", "Incoming Maturity"]:
             box = QVBoxLayout()
             self.lbl_title = QLabel(title)
             self.lbl_count = QLabel("0")
@@ -417,7 +417,7 @@ class Dashboard(QWidget):
             shadow = QGraphicsDropShadowEffect()
             shadow.setBlurRadius(20)
             shadow.setOffset(4, 4)
-            shadow.setColor(QColor(0, 0, 0, 50))
+            shadow.setColor(QColor(20, 20, 20, 20))
             self.box_frame.setGraphicsEffect(shadow)
 
             stats_layout.addWidget(self.box_frame)
@@ -440,7 +440,7 @@ class Dashboard(QWidget):
         pie_shadow = QGraphicsDropShadowEffect()
         pie_shadow.setBlurRadius(20)
         pie_shadow.setOffset(4, 4)
-        pie_shadow.setColor(QColor(0, 0, 0, 0))
+        pie_shadow.setColor(QColor(20, 20, 20, 20))
         self.pie_chart_frame.setGraphicsEffect(pie_shadow)
 
         self.pie_chart_layout = QVBoxLayout(self.pie_chart_frame)
@@ -461,7 +461,7 @@ class Dashboard(QWidget):
         notepad_shadow = QGraphicsDropShadowEffect()
         notepad_shadow.setBlurRadius(20)
         notepad_shadow.setOffset(4, 4)
-        notepad_shadow.setColor(QColor(0, 0, 0, 100))
+        notepad_shadow.setColor(QColor(20, 20, 20, 20))
         self.notepad_panel.setGraphicsEffect(notepad_shadow)
 
         self.notepad_layout = QVBoxLayout(self.notepad_panel)
@@ -504,7 +504,7 @@ class Dashboard(QWidget):
         calendar_shadow = QGraphicsDropShadowEffect()
         calendar_shadow.setBlurRadius(20)
         calendar_shadow.setOffset(4, 4)
-        calendar_shadow.setColor(QColor(0, 0, 0, 100))
+        calendar_shadow.setColor(QColor(20, 20, 20, 20))
         self.calendar_frame.setGraphicsEffect(calendar_shadow)
 
         calendar_layout = QVBoxLayout(self.calendar_frame)
@@ -515,7 +515,6 @@ class Dashboard(QWidget):
         self.calendar_widget.setHorizontalHeaderFormat(QCalendarWidget.ShortDayNames)
         self.calendar_widget.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.calendar_widget.setDateEditEnabled(False)
-
         self.calendar_widget.setStyleSheet("""
             QCalendarWidget {
                 background-color: white;
@@ -556,7 +555,7 @@ class Dashboard(QWidget):
         bar_shadow = QGraphicsDropShadowEffect()
         bar_shadow.setBlurRadius(25)
         bar_shadow.setOffset(4, 4)
-        bar_shadow.setColor(QColor(0, 0, 0, 0))
+        bar_shadow.setColor(QColor(20, 20, 20, 20))
         self.bar_chart_frame.setGraphicsEffect(bar_shadow)
 
         self.bar_chart_layout = QVBoxLayout()
@@ -574,7 +573,7 @@ class Dashboard(QWidget):
         main_layout.addLayout(content_layout)
 
         # Footer
-        self.footer = QLabel(None)
+        self.footer = QLabel("Copyright ©2025 Ambu A/S")
         self.update_stats()
         self.footer.setFont(QFont("Times New Roman", 12))
         self.footer.setStyleSheet("background-color: #b60338; color: black;")
@@ -649,8 +648,8 @@ class Dashboard(QWidget):
             self.open_report_widget()
 
     def update_stats(self):
-        total_batch = 0
-        total_product_owner = 0
+        total_batch_approved = 0
+        total_users = 0
         pending_approvals = 0
         incoming_maturity = 0
 
@@ -660,7 +659,7 @@ class Dashboard(QWidget):
 
             # Total approved (Total Batch)
             cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Approved'")
-            total_batch = cur.fetchone()[0]
+            total_batch_approved = cur.fetchone()[0]
 
             # Pending approvals
             cur.execute("SELECT COUNT(*) FROM products WHERE status = 'Pending'")
@@ -689,14 +688,14 @@ class Dashboard(QWidget):
             conn = sqlite3.connect("employees.db")
             cur = conn.cursor()
             cur.execute("SELECT COUNT(*) FROM employees")
-            total_product_owner = cur.fetchone()[0]
+            total_users = cur.fetchone()[0]
             conn.close()
         except:
-            total_product_owner = 0
+            total_users = 0
 
         # Update the stat box labels
-        stat_titles = ["Total Batch", "Total Product Owner", "Pending Approvals", "Incoming Maturity"]
-        stat_values = [total_batch, total_product_owner, pending_approvals, incoming_maturity]
+        stat_titles = ["Total Batch Approved", "Total Users", "Pending Approvals", "Incoming Maturity"]
+        stat_values = [total_batch_approved, total_users, pending_approvals, incoming_maturity]
 
         labels = self.stats_container.findChildren(QLabel)
         for i in range(len(labels)):
@@ -712,20 +711,27 @@ class Dashboard(QWidget):
         if self.dark_mode:
             msg_box.setStyleSheet("""
                 QMessageBox {
-                    background-color: #121212;
+                    background-color: #d9d9d9;
                     color: white;
                     font-size: 16px;
                 }
                 QLabel {
-                    color: white;
+                    background-color: #d9d9d9;
+                    color: black;
                     font-size: 16px;
                 }
                 QPushButton {
-                    background-color: white;
-                    color: black;
+                    background-color: #d9d9d9;
+                    color: white;
+                    padding: 6px 12px;
+                    border: 1px solid white;
+                    border-radius: 4px;
                 }
                 QPushButton:hover {
-                    background-color: #121212;
+                    background-color: #3d3d3d;
+                }
+                QPushButton:pressed {
+                    background-color: #555555;
                 }
             """)
         else:
@@ -835,7 +841,7 @@ class Dashboard(QWidget):
             self.toggle_button.setStyleSheet("""QPushButton {background-color: white;color: black;font-size: 24px;font-weight: bold;border: none;border-radius: 5px;}QPushButton:hover {background-color: rgba(255, 255, 255, 0.40);color: white;}""")
             self.footer.setStyleSheet("background-color: #333; color: white;")
             self.pie_chart_frame.setStyleSheet("""QFrame {background-color: white; border-radius: 15px;}""")
-            self.save_button.setStyleSheet("""QPushButton {background-color: #333; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: rgba(180, 180, 180, 0.40); color: black;}""")
+            self.save_button.setStyleSheet("""QPushButton {background-color: black; color: white; border-radius: 5px; padding: 6px 12px;}QPushButton:hover {background-color: black; color: white;}""")
             self.bar_chart_frame.setStyleSheet("""QFrame {background-color: white ;border-radius: 15px;}""")
             self.dash_title.setStyleSheet("border-radius: none; font-size: 35px; color: white; background-color: transparent; font-family: Gabriola;")
             self.title_text.setStyleSheet("color: white;")
@@ -959,7 +965,7 @@ class Dashboard(QWidget):
         x_indexes = range(len(categories))
         activity_color = '#4aadaa'
 
-        ax.bar(x_indexes, activity, width=bar_width, label="Total Quantity", color=activity_color)
+        ax.bar(x_indexes, activity, width=bar_width, label="Category", color=activity_color)
 
         max_val = max(activity) if activity else 0
         lower = 0
@@ -969,8 +975,8 @@ class Dashboard(QWidget):
 
         ax.set_xticks(x_indexes)
         ax.set_xticklabels(categories, rotation=0, ha='center')
-        ax.set_ylabel("TOTAL QUANTITY")
-        ax.set_title("BATCH DISTRIBUTION BY CATEGORY",fontweight="bold", fontsize=14, fontname="Candara")
+        ax.set_ylabel("TOTAL QUANTITY", fontweight="bold", fontsize=14, fontname="Candara")
+        ax.set_title("BATCH DISTRIBUTION",fontweight="bold", fontsize=14, fontname="Candara")
         ax.legend(loc='upper right')
         ax.grid(axis='y', linestyle='--', alpha=0.3)
 
