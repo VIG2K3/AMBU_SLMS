@@ -6,6 +6,3 @@ CONTRIBUTION:
 3. All the py files in my branch, I have contributed front and backend
 4. LoginPageNew is for integrated form access
 5. I link loginpage's and other gui to the dashboard
-   
-
-
