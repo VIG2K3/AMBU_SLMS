@@ -14,6 +14,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
+
 # DATABASE (MAIN)
 class DatabaseManager:
     def __init__(self, db_file="Product.db"):
@@ -114,9 +115,9 @@ class ReportSystem(QWidget):
         # Header styling
         self.active_table.setStyleSheet("""
             QHeaderView::section {
-                background-color: #b60338;
+                background-color: #f0f0f0;
                 font-weight: bold;
-                color: white;
+                color: black;
                 font-size: 15px;
                 padding: 6px;
                 border: 1px solid #ccc;
@@ -159,7 +160,7 @@ class ReportSystem(QWidget):
         self.search_input.setStyleSheet("""
             QLineEdit {
                 background-color: white;
-                border: 1px solid #555;
+                border: 1px solid black;
                 border-radius: 5px;
                 padding: 5px;
                 font-size: 14px;
@@ -199,9 +200,9 @@ class ReportSystem(QWidget):
         self.history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.history_table.setStyleSheet("""
             QHeaderView::section {
-                background-color: #b60338;
+                background-color: #f0f0f0;
                 font-weight: bold;
-                color: white;
+                color: black;
                 font-size: 15px;
                 padding: 6px;
                 border: 1px solid #ccc;
@@ -387,8 +388,8 @@ class ReportSystem(QWidget):
                 QMessageBox.critical(self, "Export Failed", f"Error occurred:\n{str(e)}")
 
 
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = ReportSystem()
-    window.showMaximized()
-    sys.exit(app.exec_())
+# if __name__ == "__main__":
+#     app = QApplication(sys.argv)
+#     window = ReportSystem()
+#     window.showMaximized()
+#     sys.exit(app.exec_())
