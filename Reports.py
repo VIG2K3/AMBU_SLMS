@@ -14,7 +14,6 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-
 # DATABASE (MAIN)
 class DatabaseManager:
     def __init__(self, db_file="Product.db"):
@@ -71,7 +70,6 @@ report_cursor.execute('''
 report_conn.commit()
 
 # SYSTEM UI
-
 class ReportSystem(QWidget):
     def __init__(self):
         super().__init__()
@@ -117,6 +115,7 @@ class ReportSystem(QWidget):
         self.active_table.setStyleSheet("""
             QHeaderView::section {
                 background-color: #b60338;
+                font-weight: bold;
                 color: white;
                 font-size: 15px;
                 padding: 6px;
@@ -201,6 +200,7 @@ class ReportSystem(QWidget):
         self.history_table.setStyleSheet("""
             QHeaderView::section {
                 background-color: #b60338;
+                font-weight: bold;
                 color: white;
                 font-size: 15px;
                 padding: 6px;
@@ -387,8 +387,8 @@ class ReportSystem(QWidget):
                 QMessageBox.critical(self, "Export Failed", f"Error occurred:\n{str(e)}")
 
 
-# if __name__ == "__main__":
-#     app = QApplication(sys.argv)
-#     window = ReportSystem()
-#     window.showMaximized()
-#     sys.exit(app.exec_())
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = ReportSystem()
+    window.showMaximized()
+    sys.exit(app.exec_())
