@@ -46,7 +46,8 @@ class DatabaseManager:
                                     test_date TEXT,
                                     created_date TEXT DEFAULT CURRENT_TIMESTAMP,
                                     status TEXT NOT NULL DEFAULT 'Pending',
-                                    creator_type TEXT NOT NULL 
+                                    creator_type TEXT NOT NULL,
+                                    creator_username TEXT NOT NULL
                                 );"""
 
         try:
@@ -56,6 +57,7 @@ class DatabaseManager:
         except Error as e:
             print(e)
 
+    # to clean and normalize the email where using comma to seperate
     def _process_emails(self, email_string):
         """Helper method to clean and normalize email strings"""
         if not email_string:
@@ -68,7 +70,7 @@ class DatabaseManager:
         return ', '.join(emails) if emails else None
 
     # add a new product into the database.
-    def add_product(self, product):
+    def add_product(self, product, username):
         """Add a new product to the products table"""
         # convert product tuple to list for modification
         product_data = list(product)
@@ -82,12 +84,12 @@ class DatabaseManager:
             product_data[2] = None
 
         sql = '''INSERT INTO products(category, name, description, quantity, 
-                 supplier_email, barcode, test_date, status, creator_type)
-                 VALUES(?,?,?,?,?,?,?,?,?)'''
+                 supplier_email, barcode, test_date, status, creator_type, creator_username)
+                 VALUES(?,?,?,?,?,?,?,?,?,?)'''
         try:
             c = self.conn.cursor()
             # add user as the creator_type
-            product_with_creator = tuple(product_data) + ('user',)
+            product_with_creator = tuple(product_data) + ('user', username)
             c.execute(sql, product_with_creator)
             self.conn.commit()
             return c.lastrowid
@@ -109,11 +111,15 @@ class DatabaseManager:
             return None
 
     # get all products from the database.
-    def get_all_products(self):
+    def get_all_products(self, username=None):
         """Query all products from the database"""
         try:
             c = self.conn.cursor()
-            c.execute("SELECT * FROM products WHERE creator_type = 'user' ORDER BY id")
+            if username:
+                c.execute("SELECT * FROM products WHERE creator_username = ? ORDER BY id", (username,))
+
+            else:
+                c.execute("SELECT * FROM products ORDER BY id")
             return c.fetchall()
         except Error as e:
             print(e)
@@ -135,23 +141,34 @@ class DatabaseManager:
             return []
 
     # search products based on type such ID, Name, Category and search term.
-    def search_products(self, search_type, search_term):
+    def search_products(self, search_type, search_term, username=None):
         """Search products based on type and term"""
         try:
             c = self.conn.cursor()
-            base_query = "SELECT * FROM products WHERE creator_type = 'user' AND "
+            base_query = "SELECT * FROM products WHERE "
+
+            if username:
+                base_query += "creator_username = ? AND "
 
             if search_type == "ID":
-                c.execute(base_query + "id = ?", (search_term,))
+                query = base_query + "id = ?"
+                params = [username, search_term] if username else [search_term]
+
             elif search_type == "Name":
-                c.execute(base_query + "name LIKE ?", (f'%{search_term}%',))
+                query = base_query + "name LIKE ?"
+                params = [username, f'%{search_term}%'] if username else [f'%{search_term}%']
+
             elif search_type == "Category":
-                c.execute(base_query + "category LIKE ?", (f'%{search_term}%',))
+                query = base_query + "category LIKE ?"
+                params = [username, f'%{search_term}%'] if username else [f'%{search_term}%']
+
             elif search_type == "Description":
-                c.execute(base_query + "description LIKE ?", (f'%{search_term}%',))
+                query = base_query + "description LIKE ?"
+                params = [username, f'%{search_term}%'] if username else [f'%{search_term}%']
             else:
                 return []
 
+            c.execute(query, params)
             return c.fetchall()
         except Error as e:
             print(e)
@@ -332,8 +349,9 @@ class BarcodePopup(QDialog):
 
 
 class ProductManager(QMainWindow):
-    def __init__(self):
+    def __init__(self, username=None):
         super().__init__()
+        self.username = username
         self.barcode_gen = BarcodeGenerator()
         self.db = DatabaseManager()
         self.setWindowTitle("Product Manager")
@@ -378,12 +396,11 @@ class ProductManager(QMainWindow):
     # loads all product from database into the table.
     def load_products_from_db(self):
         self.table.setRowCount(0)
-        products = self.db.get_all_products()
+        products = self.db.get_all_products(self.username)
 
         for product in products:
-            pid, category, name, description, qty, supplier_email, barcode, test_date, created, status, creator_type = product
-            self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, status,
-                               created)
+            pid, category, name, description, qty, supplier_email, barcode, test_date, created, status, creator_type, creator_username = product
+            self.add_table_row(pid, category, name, description, qty, supplier_email, barcode, test_date, status, created, creator_username)
 
     # creates the search section of the UI.
     def create_search_group(self):
@@ -755,8 +772,7 @@ class ProductManager(QMainWindow):
         self.clear_button.clicked.connect(self.clear_fields)
 
     # adds a row to the table.
-    def add_table_row(self, pid, category, name, description, qty, supplier_email="", barcode="", test_date="",
-                      status="", created_date=None):
+    def add_table_row(self, pid, category, name, description, qty, supplier_email="", barcode="", test_date="", status="", created_date=None, creator_username=""):
         row_position = self.table.rowCount()
         self.table.insertRow(row_position)
 
@@ -799,7 +815,7 @@ class ProductManager(QMainWindow):
         status_item.setTextAlignment(Qt.AlignCenter)
         status_item.setFlags(status_item.flags() & ~Qt.ItemIsEditable)
 
-        # Set background color based on status sucuh approve, rejected and pending 
+        # Set background color based on status sucuh approve, rejected and pending
         if status == "Approved":
             status_item.setBackground(Qt.green)
         elif status == "Rejected":
@@ -861,7 +877,7 @@ class ProductManager(QMainWindow):
 
             product = (category, name, description if description else None, int(qty), supplier_email, filename,
                        test_date if test_date else None, status)
-            product_id = self.db.add_product(product)
+            product_id = self.db.add_product(product, self.username)
 
             if product_id:
                 self.add_table_row(product_id, category, name, description, qty, supplier_email, filename, test_date,
@@ -958,7 +974,7 @@ class ProductManager(QMainWindow):
                 if status_item and status_item.text() != status:
                     self.table.setRowHidden(row, True)
         else:
-            products = self.db.search_products(search_type, search_term)
+            products = self.db.search_products(search_type, search_term, self.username)
 
             # if searching by something other than date then filter the table
             if search_type != "Date Range":
