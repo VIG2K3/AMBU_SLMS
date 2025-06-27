@@ -181,12 +181,12 @@ class LoginWindow(QWidget):
         result = cursor.fetchone()
 
         if result:
-            self.open_form()
+            self.open_form(username)
         else:
             QMessageBox.critical(self, "Login Failed", "Invalid username or password.")
 
-    def open_form(self):
-        self.NewBatchForm = NewBatchForm()
+    def open_form(self, username):
+        self.NewBatchForm = NewBatchForm(username)
         self.NewBatchForm.logout_signal.connect(self.show_login_again)  # Reopen login on logout
         self.NewBatchForm.showFullScreen()
         self.hide()  # Hide login not close

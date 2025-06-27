@@ -188,7 +188,7 @@ class LoginWindow(QWidget):
         if result:
             role = result[0]
             if role != "Admin":
-                QMessageBox.critical(self, "Access Denied", "Only Admins can access this login.")
+                QMessageBox.critical(self, "Access Denied", "Only Admin can access this login.")
                 return
             self.open_dashboard()  # Login success
         else:

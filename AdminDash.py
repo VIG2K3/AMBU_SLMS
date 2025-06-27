@@ -751,7 +751,6 @@ class Dashboard(QWidget):
             self.sidebar_widget.setStyleSheet("background-color: #b60338; color: white; border-top-right-radius: 15px; border-bottom-right-radius: 15px;")
             self.toggle_panel.setStyleSheet("background-color: #b60338; border-radius: 15px;")
             self.sidebar_container.setStyleSheet("background-color: #b60338; border-radius: 15px;")
-
             self.default_sidebar_style = """
                            QPushButton {
                                text-align: left;
@@ -807,7 +806,6 @@ class Dashboard(QWidget):
             self.sidebar_widget.setStyleSheet("background-color: #333; color: white; border-top-right-radius: 15px; border-bottom-right-radius: 15px;")
             self.toggle_panel.setStyleSheet("background-color: #333; border-radius: 15px;")
             self.sidebar_container.setStyleSheet("background-color: #333; border-radius: 15px;")
-
             self.default_sidebar_style = """
                            QPushButton {
                                text-align: left;
