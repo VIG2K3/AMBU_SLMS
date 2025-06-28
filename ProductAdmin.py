@@ -952,7 +952,7 @@ class ProductManager(QMainWindow):
                     if supplier_email:
                         emails = [e.strip() for e in supplier_email.split(',') if e.strip()]
                         subject = f"Product Approved: {product_name}"
-                        body = f"""Dear Prodcut Owner,
+                        body = f"""Dear Product Owner,
 
 Your product "{product_name}" (ID: {product_id}) has been approved.
 
